@@ -47,7 +47,7 @@ export default function LoginPage() {
         <div className="flex justify-center">
           <div className="relative w-32 h-32">
             <Image
-              src="/TheClico_Logo.svg"
+              src="/TheClico_Logovectoral.svg"
               alt="TheClico Logo"
               width={128}
               height={128}
