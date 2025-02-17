@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { TextAnalyticsClient, AzureKeyCredential } from "@azure/ai-text-analytics";
-import gplay from 'google-play-scraper';
+import * as gplay from 'google-play-scraper';
 
 const client = new TextAnalyticsClient(
   process.env.AZURE_TEXT_ANALYTICS_ENDPOINT || "",
