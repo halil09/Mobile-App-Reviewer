@@ -6,6 +6,13 @@ if (!MONGODB_URI) {
   throw new Error('MongoDB URI tanımlanmamış.');
 }
 
+declare global {
+  var mongoose: {
+    conn: mongoose.Connection | null;
+    promise: Promise<mongoose.Connection> | null;
+  } | undefined;
+}
+
 let cached = global.mongoose;
 
 if (!cached) {
@@ -13,6 +20,10 @@ if (!cached) {
 }
 
 async function connectDB() {
+  if (!cached) {
+    cached = global.mongoose = { conn: null, promise: null };
+  }
+
   if (cached.conn) {
     return cached.conn;
   }
@@ -23,7 +34,7 @@ async function connectDB() {
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose;
+      return mongoose.connection;
     });
   }
 

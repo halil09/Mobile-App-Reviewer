@@ -24,9 +24,8 @@ interface AppAnalysis {
   };
   sentimentTrend: {
     date: string;
-    positive: number;
-    neutral: number;
-    negative: number;
+    text: string;
+    sentiment: string;
   }[];
 }
 

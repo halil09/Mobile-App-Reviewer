@@ -1,7 +1,21 @@
-import { TextAnalyticsClient, AzureKeyCredential } from "@azure/ai-text-analytics";
+import { TextAnalyticsClient, AzureKeyCredential, TextDocumentInput } from "@azure/ai-text-analytics";
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
+
+interface Review {
+  id: string;
+  text: string;
+}
+
+interface AnalyzedReview extends Review {
+  sentiment: string;
+  confidenceScores: {
+    positive: number;
+    neutral: number;
+    negative: number;
+  };
+}
 
 const client = new TextAnalyticsClient(
   process.env.AZURE_TEXT_ANALYTICS_ENDPOINT || "",
@@ -30,17 +44,16 @@ export async function POST(request: Request) {
 
     // Yorumları 10'arlı gruplara ayır
     const reviewChunks = chunkArray(reviews, 10);
-    let allAnalyzedReviews = [];
+    let allAnalyzedReviews: AnalyzedReview[] = [];
 
     // Her grubu ayrı ayrı analiz et
     for (const chunk of reviewChunks) {
-      const documents = chunk.map((review: any) => ({
+      const documents: TextDocumentInput[] = chunk.map((review: Review) => ({
         text: review.text,
-        id: review.id,
-        language: "tr"
+        id: review.id
       }));
 
-      const results = await client.analyzeSentiment(documents, { language: "tr" });
+      const results = await client.analyzeSentiment(documents);
 
       // Sonuçları formatla ve ana diziye ekle
       const analyzedChunk = results.map((result, index) => {
