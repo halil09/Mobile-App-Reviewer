@@ -6,7 +6,16 @@ const nextConfig = {
     serverComponentsExternalPackages: ['google-play-scraper']
   },
   images: {
-    domains: ['play-lh.googleusercontent.com', 'is1-ssl.mzstatic.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'play-lh.googleusercontent.com'
+      },
+      {
+        protocol: 'https',
+        hostname: 'is1-ssl.mzstatic.com'
+      }
+    ],
     unoptimized: true
   },
   webpack: (config) => {
