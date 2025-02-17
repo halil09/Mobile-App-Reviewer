@@ -101,11 +101,12 @@ export function Sidebar({}: SidebarProps) {
             <div className="flex items-center justify-center">
               <div className="relative w-32 h-32 rounded-xl overflow-hidden">
                 <Image
-                  src="/TheClico_Logo.png"
+                  src="/TheClico_Logo.svg"
                   alt="TheClico Logo"
                   width={128}
                   height={128}
                   className="rounded-xl"
+                  priority
                 />
               </div>
             </div>
