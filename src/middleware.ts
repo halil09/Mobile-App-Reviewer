@@ -5,8 +5,8 @@ export function middleware(request: NextRequest) {
   const authToken = request.cookies.get('auth_token');
   const { pathname } = request.nextUrl;
 
-  // Login sayfasına erişimi her zaman izin ver
-  if (pathname === '/login') {
+  // Login ve signup sayfalarına erişimi her zaman izin ver
+  if (pathname === '/login' || pathname === '/signup') {
     // Eğer kullanıcı zaten giriş yapmışsa ana sayfaya yönlendir
     if (authToken) {
       return NextResponse.redirect(new URL('/', request.url));
