@@ -5,40 +5,51 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 
-export default function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+export default function SignupPage() {
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    name: ''
+  });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Giriş yapılırken bir hata oluştu');
+        throw new Error(data.error || 'Kayıt olurken bir hata oluştu');
       }
 
-      // Başarılı giriş
-      router.push('/');
+      // Başarılı kayıt
+      router.push('/login');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Giriş yapılırken bir hata oluştu');
+      setError(err instanceof Error ? err.message : 'Kayıt olurken bir hata oluştu');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
   };
 
   return (
@@ -61,24 +72,57 @@ export default function LoginPage() {
         {/* Başlık */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-800">
-            Hoş Geldiniz
+            Hesap Oluştur
           </h2>
           <p className="mt-2 text-gray-600">
-            Lütfen hesabınıza giriş yapın
+            Hemen ücretsiz hesabınızı oluşturun
           </p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              Ad Soyad
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              value={formData.name}
+              onChange={handleChange}
+              required
+              className="mt-1 block w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              placeholder="Adınızı ve soyadınızı girin"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              E-posta
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              className="mt-1 block w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              placeholder="E-posta adresinizi girin"
+            />
+          </div>
+
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-gray-700">
               Kullanıcı Adı
             </label>
             <input
               id="username"
+              name="username"
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={formData.username}
+              onChange={handleChange}
               required
               className="mt-1 block w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               placeholder="Kullanıcı adınızı girin"
@@ -91,9 +135,10 @@ export default function LoginPage() {
             </label>
             <input
               id="password"
+              name="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={formData.password}
+              onChange={handleChange}
               required
               className="mt-1 block w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               placeholder="Şifrenizi girin"
@@ -118,13 +163,13 @@ export default function LoginPage() {
               ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
-            {isLoading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
+            {isLoading ? 'Kayıt Yapılıyor...' : 'Kayıt Ol'}
           </button>
 
           <div className="text-center text-sm text-gray-600">
-            Hesabınız yok mu?{' '}
-            <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-              Hemen Kaydolun
+            Zaten hesabınız var mı?{' '}
+            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+              Giriş Yap
             </Link>
           </div>
         </form>

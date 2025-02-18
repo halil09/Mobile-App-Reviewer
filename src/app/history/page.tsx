@@ -51,10 +51,10 @@ export default function HistoryPage() {
         <Sidebar />
       </div>
       
-      <main className="flex-1 p-6 lg:p-8 transition-all duration-300 md:ml-64">
+      <main className="flex-1 p-6 lg:p-8 transition-all duration-300">
         <div className="max-w-[1920px] mx-auto">
           {/* Başlık */}
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-800">Geçmiş Analizler</h1>
             <p className="mt-2 text-gray-600">
               Daha önce yapılan tüm analizleri görüntüleyin ve inceleyin
