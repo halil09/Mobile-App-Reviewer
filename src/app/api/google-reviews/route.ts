@@ -124,9 +124,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'App ID gerekli' }, { status: 400 });
     }
 
+    // URL'yi temizle ve app ID'yi çıkar
+    let cleanAppId = appId;
+    
+    // URL'nin başındaki @ işaretini kaldır
+    cleanAppId = cleanAppId.replace(/^@/, '');
+    
     // URL'den app ID'yi çıkar
-    const appIdMatch = appId.match(/id=([^&]+)/);
-    const cleanAppId = appIdMatch ? appIdMatch[1] : appId;
+    const appIdMatch = cleanAppId.match(/id=([^&]+)/);
+    if (appIdMatch) {
+      cleanAppId = appIdMatch[1];
+    }
+    
     console.log('Cleaned app ID:', cleanAppId);
 
     // Google Play'den yorumları çek
@@ -140,15 +149,17 @@ export async function POST(request: Request) {
         num: 100
       });
 
-      console.log('Raw reviews result:', reviewsResult);
+      // reviewsResult direkt olarak bir dizi olabilir
+      const reviewsArray = Array.isArray(reviewsResult) ? reviewsResult : 
+                         reviewsResult?.data ? reviewsResult.data : [];
 
-      if (!reviewsResult || !Array.isArray(reviewsResult.data)) {
-        console.error('Invalid reviews result:', reviewsResult);
+      if (!reviewsArray || reviewsArray.length === 0) {
+        console.error('Yorum bulunamadı:', reviewsResult);
         return NextResponse.json({ error: 'Yorumlar çekilemedi' }, { status: 404 });
       }
 
       // Yorumları formatla
-      const reviews = reviewsResult.data.map((review: any) => ({
+      const reviews = reviewsArray.map((review: any) => ({
         id: review.id || Math.random().toString(),
         userName: review.userName || 'Anonim Kullanıcı',
         title: review.title || '',
