@@ -101,13 +101,14 @@ export function Sidebar({}: SidebarProps) {
             <div className="flex items-center justify-center">
               <div className="relative w-64 h-64 rounded-xl overflow-hidden">
                 <Image
-                  src="/TheClico_Logovectoral.svg"
+                  src="/TheClico_Logo.png"
                   alt="TheClico Logo"
                   width={256}
                   height={256}
-                  className="rounded-xl"
+                  className="object-contain rounded-xl"
                   priority
-                  unoptimized
+                  placeholder="blur"
+                  blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
                 />
               </div>
             </div>
