@@ -59,7 +59,7 @@ export default function SignupPage() {
         <div className="flex justify-center">
           <div className="relative w-48 h-48">
             <Image
-              src="/TheClico_Logovectoral.svg"
+              src="/TheClico_Logo.png"
               alt="TheClico Logo"
               width={192}
               height={192}
