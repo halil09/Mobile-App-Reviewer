@@ -18,22 +18,27 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 async function fetchGooglePlayData(appId: string) {
+  console.log('Fetching data for app ID:', appId);
   try {
     // Uygulama bilgilerini çek
+    console.log('Fetching app info...');
     const appInfo = await gplay.app({
       appId: appId,
       lang: 'tr',
       country: 'tr'
     });
+    console.log('App info fetched successfully');
 
     // Yorumları çek
+    console.log('Fetching reviews...');
     const reviewsResult = await gplay.reviews({
       appId: appId,
       lang: 'tr',
       country: 'tr',
-      sort: gplay.sort.HELPFULNESS,
+      sort: gplay.sort.NEWEST,
       num: 50 // 50 yorum çek
     });
+    console.log('Reviews fetched successfully, count:', reviewsResult.length);
 
     // Yorumları formatla
     const reviews = (Array.isArray(reviewsResult) ? reviewsResult : []).map(review => ({
@@ -112,39 +117,69 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { appId } = await request.json();
+    console.log('Received request for app ID:', appId);
 
     if (!appId) {
+      console.error('App ID eksik');
       return NextResponse.json({ error: 'App ID gerekli' }, { status: 400 });
     }
 
+    // URL'den app ID'yi çıkar
+    const appIdMatch = appId.match(/id=([^&]+)/);
+    const cleanAppId = appIdMatch ? appIdMatch[1] : appId;
+    console.log('Cleaned app ID:', cleanAppId);
+
     // Google Play'den yorumları çek
-    const reviewsResult = await gplay.reviews({
-      appId: appId,
-      lang: 'tr',
-      country: 'tr',
-      sort: gplay.sort.HELPFULNESS,
-      num: 100
-    });
+    console.log('Fetching reviews from Google Play...');
+    try {
+      const reviewsResult = await gplay.reviews({
+        appId: cleanAppId,
+        lang: 'tr',
+        country: 'tr',
+        sort: gplay.sort.NEWEST,
+        num: 100
+      });
 
-    // Yorumları formatla
-    const reviews = (Array.isArray(reviewsResult) ? reviewsResult : []).map((review: GooglePlayReview) => ({
-      id: review.id || Math.random().toString(),
-      userName: review.userName || 'Anonim Kullanıcı',
-      title: review.title || '',
-      text: review.text || '',
-      score: review.score || 0,
-      thumbsUp: review.thumbsUp || 0,
-      replyDate: review.replyDate || null,
-      date: review.date || new Date().toISOString(),
-      version: review.version || '',
-      appVersion: review.appVersion || ''
-    }));
+      console.log('Raw reviews result:', reviewsResult);
 
-    return NextResponse.json({ reviews });
+      if (!reviewsResult || !Array.isArray(reviewsResult.data)) {
+        console.error('Invalid reviews result:', reviewsResult);
+        return NextResponse.json({ error: 'Yorumlar çekilemedi' }, { status: 404 });
+      }
+
+      // Yorumları formatla
+      const reviews = reviewsResult.data.map((review: any) => ({
+        id: review.id || Math.random().toString(),
+        userName: review.userName || 'Anonim Kullanıcı',
+        title: review.title || '',
+        text: review.text || '',
+        score: review.score || 0,
+        thumbsUp: review.thumbsUp || 0,
+        replyDate: review.replyDate || null,
+        date: review.date || new Date().toISOString(),
+        version: review.version || '',
+        appVersion: review.appVersion || ''
+      }));
+
+      console.log('Formatted reviews count:', reviews.length);
+      return NextResponse.json({ reviews });
+    } catch (error) {
+      console.error('Google Play scraping error:', error);
+      return NextResponse.json(
+        { 
+          error: 'Google Play yorumları çekilemedi',
+          details: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Google Play yorumları çekilirken hata:', error);
+    console.error('Request handling error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Yorumlar çekilirken bir hata oluştu' },
+      { 
+        error: error instanceof Error ? error.message : 'Yorumlar çekilirken bir hata oluştu',
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     );
   }
