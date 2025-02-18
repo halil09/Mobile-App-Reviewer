@@ -14,6 +14,11 @@ interface GooglePlayReview {
   appVersion?: string;
 }
 
+interface ReviewsResult {
+  data?: GooglePlayReview[];
+  [key: string]: any;
+}
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
@@ -147,19 +152,24 @@ export async function POST(request: Request) {
         country: 'tr',
         sort: gplay.sort.NEWEST,
         num: 100
-      });
+      }) as ReviewsResult | GooglePlayReview[];
 
-      // reviewsResult direkt olarak bir dizi olabilir
-      const reviewsArray = Array.isArray(reviewsResult) ? reviewsResult : 
-                         reviewsResult?.data ? reviewsResult.data : [];
+      // reviewsResult'ı işle
+      let reviewsArray: GooglePlayReview[] = [];
+      
+      if (Array.isArray(reviewsResult)) {
+        reviewsArray = reviewsResult;
+      } else if (reviewsResult && 'data' in reviewsResult && Array.isArray(reviewsResult.data)) {
+        reviewsArray = reviewsResult.data;
+      }
 
-      if (!reviewsArray || reviewsArray.length === 0) {
+      if (reviewsArray.length === 0) {
         console.error('Yorum bulunamadı:', reviewsResult);
         return NextResponse.json({ error: 'Yorumlar çekilemedi' }, { status: 404 });
       }
 
       // Yorumları formatla
-      const reviews = reviewsArray.map((review: any) => ({
+      const reviews = reviewsArray.map((review: GooglePlayReview) => ({
         id: review.id || Math.random().toString(),
         userName: review.userName || 'Anonim Kullanıcı',
         title: review.title || '',
