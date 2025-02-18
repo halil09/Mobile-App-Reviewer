@@ -99,12 +99,12 @@ export function Sidebar({}: SidebarProps) {
           {/* Logo ve Header */}
           <div className="p-6">
             <div className="flex items-center justify-center">
-              <div className="relative w-48 h-48 rounded-xl overflow-hidden">
+              <div className="relative w-64 h-64 rounded-xl overflow-hidden">
                 <Image
                   src="/TheClico_Logovectoral.svg"
                   alt="TheClico Logo"
-                  width={192}
-                  height={192}
+                  width={256}
+                  height={256}
                   className="rounded-xl"
                   priority
                   unoptimized
