@@ -107,6 +107,7 @@ export function Sidebar({}: SidebarProps) {
                   height={192}
                   className="rounded-xl"
                   priority
+                  unoptimized
                 />
               </div>
             </div>

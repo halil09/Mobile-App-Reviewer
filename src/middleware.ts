@@ -5,12 +5,14 @@ export function middleware(request: NextRequest) {
   const authToken = request.cookies.get('auth_token');
   const { pathname } = request.nextUrl;
 
-  // Login ve signup sayfalarına erişimi her zaman izin ver
-  if (pathname === '/login' || pathname === '/signup') {
-    // Eğer kullanıcı zaten giriş yapmışsa ana sayfaya yönlendir
-    if (authToken) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+  // Statik dosyalara ve auth sayfalarına erişime izin ver
+  if (
+    pathname.startsWith('/_next') || // Next.js sistem dosyaları
+    pathname.startsWith('/static') || // Statik dosyalar
+    pathname.includes('.') || // Dosya uzantıları (.png, .jpg vb.)
+    pathname === '/login' ||
+    pathname === '/signup'
+  ) {
     return NextResponse.next();
   }
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import Logo from '../../../public/TheClico_Logo.png';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -48,12 +49,14 @@ export default function LoginPage() {
         <div className="flex justify-center">
           <div className="relative w-48 h-48">
             <Image
-              src="/TheClico_Logo.png"
+              src={Logo}
               alt="TheClico Logo"
               width={192}
               height={192}
-              className="rounded-xl"
+              className="object-contain rounded-xl"
               priority
+              placeholder="blur"
+              blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
             />
           </div>
         </div>
