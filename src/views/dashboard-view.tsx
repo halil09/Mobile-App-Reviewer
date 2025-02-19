@@ -71,6 +71,7 @@ interface GoogleAppInfo {
   price: string;
   free: boolean;
   icon: string;
+  insights?: string;
 }
 
 interface SentimentStatistics {
@@ -248,7 +249,10 @@ export function DashboardView() {
       if (selectedPlatform === 'google') {
         setAnalyzedReviews(analyzedReviewsData);
         setSentimentStats(statistics);
-        setGoogleAppInfo(prev => ({ ...prev, insights }));
+        setGoogleAppInfo(prev => prev ? {
+          ...prev,
+          insights: insights || prev.insights
+        } : null);
         // Apple verilerini temizle
         setAnalyzedAppleReviews([]);
         setAppleSentimentStats(null);
@@ -256,7 +260,10 @@ export function DashboardView() {
       } else {
         setAnalyzedAppleReviews(analyzedReviewsData);
         setAppleSentimentStats(statistics);
-        setAppleAppInfo(prev => ({ ...prev, insights }));
+        setAppleAppInfo(prev => prev ? {
+          ...prev,
+          insights: insights || prev.insights
+        } : null);
         // Google verilerini temizle
         setAnalyzedReviews([]);
         setSentimentStats(null);
