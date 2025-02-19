@@ -27,6 +27,7 @@ interface AppAnalysis {
     text: string;
     sentiment: string;
   }[];
+  insights: string;
 }
 
 export default function CompetitorsPage() {
@@ -35,7 +36,10 @@ export default function CompetitorsPage() {
   const [competitorUrls, setCompetitorUrls] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [analyses, setAnalyses] = useState<AppAnalysis[]>([]);
+  const [googleAnalyses, setGoogleAnalyses] = useState<AppAnalysis[]>([]);
+  const [appleAnalyses, setAppleAnalyses] = useState<AppAnalysis[]>([]);
+
+  const analyses = selectedPlatform === 'google' ? googleAnalyses : appleAnalyses;
 
   const handlePlatformChange = (platform: Platform) => {
     setSelectedPlatform(platform);
@@ -79,7 +83,11 @@ export default function CompetitorsPage() {
         throw new Error(data.error || 'Analiz yapılırken bir hata oluştu');
       }
 
-      setAnalyses(data.analyses);
+      if (selectedPlatform === 'google') {
+        setGoogleAnalyses(data.analyses);
+      } else {
+        setAppleAnalyses(data.analyses);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
@@ -98,13 +106,14 @@ export default function CompetitorsPage() {
       // API'den gelen yorumları al (sentimentTrend içinde)
       return analysis.sentimentTrend.map(review => {
         const mainCategory = getMainCategory(review.text);
+        const subCategory = getSubCategory(mainCategory, review.text);
         return {
           'Uygulama Adı': analysis.appName,
           'Yorum Metni': review.text,
           'Duygu Analizi': review.sentiment === 'positive' ? 'Olumlu' : 
                           review.sentiment === 'negative' ? 'Olumsuz' : 'Nötr',
           'Ana Kategori': mainCategory,
-          'Alt Kategori': getSubCategory(mainCategory, review.text),
+          'Alt Kategori': subCategory,
           'Anahtar Kelimeler': getKeywords(review.text).join(', '),
           'Tarih': new Date(review.date).toLocaleDateString('tr-TR'),
         };
@@ -498,6 +507,22 @@ export default function CompetitorsPage() {
           {/* Analiz Sonuçları */}
           {analyses.length > 0 && (
             <div className="space-y-6">
+              {/* İçgörüler */}
+              <div className="grid grid-cols-1 gap-6">
+                {analyses.map((analysis, index) => (
+                  <Card key={`insights-${index}`} className="p-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                      {analysis.appName} - İçgörüler
+                    </h3>
+                    <div className="prose max-w-none">
+                      <p className="text-gray-600 whitespace-pre-line">
+                        {analysis.insights}
+                      </p>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
               {renderSentimentComparison()}
               {renderCategoryComparison()}
               {renderRatingDistribution()}

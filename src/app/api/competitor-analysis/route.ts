@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { TextAnalyticsClient, AzureKeyCredential, AnalyzeSentimentResultArray } from "@azure/ai-text-analytics";
 import * as gplay from 'google-play-scraper';
+import { generateInsights } from '@/lib/gemini';
 
 interface SentimentResult {
   error?: any;
@@ -47,6 +48,7 @@ interface Analysis {
     text: string;
     sentiment: string;
   }[];
+  insights: string;
 }
 
 const client = new TextAnalyticsClient(
@@ -142,14 +144,21 @@ function getAppIdFromUrl(url: string, platform: 'google' | 'apple'): string | nu
 
 function analyzeCategories(reviews: (GooglePlayReview | AppStoreReview)[]): { [key: string]: number } {
   const categories = {
-    'Performans': ['yavaş', 'donma', 'kasma', 'hızlı', 'akıcı', 'performans', 'çökme', 'bug', 'hata'],
-    'Kullanılabilirlik': ['kullanımı', 'arayüz', 'tasarım', 'menü', 'düzen', 'karmaşık', 'basit', 'kolay'],
-    'Özellikler': ['özellik', 'fonksiyon', 'seçenek', 'güncelleme', 'yenilik'],
-    'Güvenlik': ['güvenlik', 'gizlilik', 'şifre', 'hesap', 'doğrulama'],
-    'Teknik Sorunlar': ['bağlantı', 'internet', 'sunucu', 'hata', 'çöküyor', 'açılmıyor'],
-    'Müşteri Hizmetleri': ['destek', 'yardım', 'iletişim', 'çözüm', 'yanıt'],
-    'Fiyatlandırma': ['ücret', 'fiyat', 'pahalı', 'ucuz', 'ödeme', 'satın alma'],
-    'İçerik': ['içerik', 'reklam', 'bilgi', 'veri', 'paylaşım']
+    'Performans': ['yavaş', 'donma', 'kasma', 'gecikme', 'lag', 'hızlı', 'akıcı', 'stabil', 'performans', 'çökme', 'bug', 'hata', 'optimizasyon', 'yüksek FPS', 'takılma', 'yüklenme süresi', 'frame drop', 'fps düşüşü'],
+    
+    'Kullanılabilirlik': ['kullanımı', 'arayüz', 'UI', 'UX', 'tasarım', 'menü', 'düzen', 'karmaşık', 'basit', 'kolay', 'sezgisel', 'kullanıcı deneyimi', 'anlaşılır', 'kullanışlı', 'karışık', 'erişilebilirlik', 'görsel tasarım', 'tema', 'dark mode', 'renkler', 'buton', 'navigasyon'],
+    
+    'Özellikler & Güncellemeler': ['özellik', 'fonksiyon', 'seçenek', 'yenilik', 'güncelleme', 'beta', 'yeni sürüm', 'mod', 'ekstra', 'eksik', 'ekleme', 'iyileştirme', 'beta', 'özelleştirme', 'widget', 'entegre', 'plugin', 'modül', 'yeni özellik', 'feedback'],
+    
+    'Güvenlik & Gizlilik': ['güvenlik', 'gizlilik', 'şifre', 'hesap', 'doğrulama', 'hata', 'giriş', 'kimlik', 'data breach', 'hacklenme', 'açık', 'güvenlik açığı', 'kişisel veri', 'kimlik avı', 'yetkilendirme', 'token', 'biometrik', 'çift aşamalı doğrulama', 'OTP', 'hesap çalındı'],
+    
+    'Teknik Sorunlar': ['bağlantı', 'internet', 'wifi', 'mobil veri', 'sunucu', 'hata', 'çöküyor', 'açılmıyor', 'bağlanmıyor', 'ağ hatası', 'server error', 'timeout', 'yükleme hatası', '403', '404', '500', 'beklenmeyen hata', 'yanıt vermiyor', 'bağlantı koptu', 'ping', 'düşük hız', 'server down'],
+    
+    'Müşteri Hizmetleri': ['destek', 'yardım', 'iletişim', 'çözüm', 'yanıt', 'şikayet', 'cevap alamıyorum', 'geç dönüş', 'destek ekibi', 'canlı destek', 'ticket', 'e-posta', 'müşteri ilişkileri', 'şikayet var', 'geri bildirim', 'moderasyon', 'destek sistemi'],
+    
+    'Fiyatlandırma & Abonelik': ['ücret', 'fiyat', 'pahalı', 'ucuz', 'ödeme', 'satın alma', 'abonelik', 'fiyat politikası', 'free trial', 'premium', 'reklam kaldırma', 'iade', 'parayı hak etmiyor', 'tahsilat', 'yanıltıcı fiyatlandırma', 'faturalandırma', 'ödeme hatası'],
+    
+    'İçerik & Reklamlar': ['içerik', 'reklam', 'bilgi', 'veri', 'paylaşım', 'spam', 'reklam çok fazla', 'rahatsız edici reklam', 'reklam kaldırma', 'premium içerik', 'kalitesiz içerik', 'eksik içerik', 'dolandırıcılık', 'yanıltıcı bilgi', 'clickbait', 'paylaşım hatası', 'yüklenmiyor', 'içerik engeli', 'copyright', 'lisans', 'çalıntı içerik', 'moderasyon eksikliği']
   };
 
   const categoryCounts: { [key: string]: number } = {};
@@ -245,12 +254,20 @@ export async function POST(request: Request) {
         sentiment: !allSentimentResults[index]?.error ? allSentimentResults[index]?.sentiment || 'neutral' : 'neutral'
       }));
 
-      analyses.push({
+      const analysisResult = {
         appName: appData.appName,
         statistics,
         categories,
         ratings,
         sentimentTrend
+      };
+
+      // İçgörü metni oluştur
+      const insights = await generateInsights(analysisResult);
+      
+      analyses.push({
+        ...analysisResult,
+        insights
       });
     }
 

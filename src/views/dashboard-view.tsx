@@ -141,6 +141,12 @@ export function DashboardView() {
   const [sentimentStats, setSentimentStats] = useState<SentimentStatistics | null>(null);
   const [analyzedAppleReviews, setAnalyzedAppleReviews] = useState<AnalyzedAppleReview[]>([]);
   const [appleSentimentStats, setAppleSentimentStats] = useState<SentimentStatistics | null>(null);
+  const [appleAppInfo, setAppleAppInfo] = useState<any>(null);
+
+  // Platform'a göre görüntülenecek verileri seç
+  const currentReviews = selectedPlatform === 'google' ? analyzedReviews : analyzedAppleReviews;
+  const currentStats = selectedPlatform === 'google' ? sentimentStats : appleSentimentStats;
+  const currentAppInfo = selectedPlatform === 'google' ? googleAppInfo : appleAppInfo;
 
   const getAppIdFromUrl = (url: string) => {
     const match = url.match(/id(\d+)/);
@@ -183,148 +189,84 @@ export function DashboardView() {
   const handleAnalyze = async () => {
     setIsLoading(true);
     setError(null);
-    setVisibleReviewCount(10);
-    setVisibleGoogleReviewCount(10);
-    setAnalyzedReviews([]);
-    setSentimentStats(null);
-    setAnalyzedAppleReviews([]);
-    setAppleSentimentStats(null);
-    
+
     try {
-      let analysisData = {
-        platform: selectedPlatform,
-        appInfo: null,
-        analyzedReviews: [],
-        statistics: null
-      };
+      let url = selectedPlatform === 'google' ? googlePlayUrl : appStoreUrl;
+      let appId = selectedPlatform === 'google' ? getGoogleAppIdFromUrl(url) : getAppIdFromUrl(url);
 
-      if (selectedPlatform === 'apple') {
-        const appId = getAppIdFromUrl(appStoreUrl);
-        
-        if (!appId) {
-          throw new Error("Geçerli bir App Store URLsi giriniz");
-        }
-
-        const response = await fetch('/api/reviews', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ appId }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Yorumlar çekilirken bir hata oluştu");
-        }
-
-        setAppleReviews(data.reviews);
-        
-        // Apple yorumlarını analiz et
-        const sentimentResponse = await fetch('/api/sentiment-analysis', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ reviews: data.reviews }),
-        });
-
-        const sentimentData = await sentimentResponse.json();
-        
-        if (!sentimentResponse.ok) {
-          throw new Error(sentimentData.error || "Duygu analizi yapılırken bir hata oluştu");
-        }
-
-        setAnalyzedAppleReviews(sentimentData.reviews);
-        setAppleSentimentStats(sentimentData.statistics);
-
-        // Analiz verilerini güncelle
-        analysisData = {
-          ...analysisData,
-          analyzedReviews: sentimentData.reviews.map((review: any) => ({
-            ...review,
-            mainCategory: getMainCategory(review.text),
-            subCategory: getSubCategory(getMainCategory(review.text), review.text),
-            keywords: getKeywords(review.text),
-            sentimentScore: getRandomScore(review.sentiment)
-          })),
-          statistics: sentimentData.statistics
-        };
+      if (!appId) {
+        throw new Error('Geçerli bir uygulama linki giriniz');
       }
 
-      if (selectedPlatform === 'google') {
-        const appId = getGoogleAppIdFromUrl(googlePlayUrl);
-        
-        if (!appId) {
-          throw new Error("Geçerli bir Google Play Store URLsi giriniz");
-        }
-
-        const response = await fetch('/api/google-reviews', {
+      // Yorumları çek
+      const reviewsResponse = await fetch(
+        `/api/${selectedPlatform === 'google' ? 'google-reviews' : 'reviews'}`,
+        {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ appId }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Google Play Store yorumları çekilirken bir hata oluştu");
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appId })
         }
+      );
 
-        setGoogleReviews(data.reviews);
-        setGoogleAppInfo(data.appInfo);
-
-        // Yorumları analiz et
-        const sentimentResponse = await fetch('/api/sentiment-analysis', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ reviews: data.reviews }),
-        });
-
-        const sentimentData = await sentimentResponse.json();
-
-        if (!sentimentResponse.ok) {
-          throw new Error(sentimentData.error || "Duygu analizi yapılırken bir hata oluştu");
-        }
-
-        setAnalyzedReviews(sentimentData.reviews);
-        setSentimentStats(sentimentData.statistics);
-
-        // Analiz verilerini güncelle
-        analysisData = {
-          ...analysisData,
-          appInfo: data.appInfo,
-          analyzedReviews: sentimentData.reviews.map((review: any) => ({
-            ...review,
-            mainCategory: getMainCategory(review.text),
-            subCategory: getSubCategory(getMainCategory(review.text), review.text),
-            keywords: getKeywords(review.text),
-            sentimentScore: getRandomScore(review.sentiment)
-          })),
-          statistics: sentimentData.statistics
-        };
+      if (!reviewsResponse.ok) {
+        throw new Error('Yorumlar çekilirken bir hata oluştu');
       }
 
-      // Analiz sonuçlarını kaydet
-      const saveResponse = await fetch('/api/save-analysis', {
+      const reviewsData = await reviewsResponse.json();
+
+      // Duygu analizi yap
+      const sentimentResponse = await fetch('/api/sentiment-analysis', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(analysisData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviews: reviewsData.reviews })
       });
 
-      if (!saveResponse.ok) {
-        console.error('Analiz kaydedilemedi:', await saveResponse.json());
+      if (!sentimentResponse.ok) {
+        throw new Error('Duygu analizi yapılırken bir hata oluştu');
       }
 
+      const { reviews: analyzedReviewsData, statistics } = await sentimentResponse.json();
+
+      // İçgörü oluştur
+      const insightsResponse = await fetch('/api/generate-insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appName: selectedPlatform === 'google' ? 'GooglePlay App' : `AppStore App (ID: ${appId})`,
+          reviews: analyzedReviewsData,
+          statistics
+        })
+      });
+
+      if (!insightsResponse.ok) {
+        throw new Error('İçgörüler oluşturulurken bir hata oluştu');
+      }
+
+      const { insights } = await insightsResponse.json();
+
+      // Platform'a göre state'leri güncelle
+      if (selectedPlatform === 'google') {
+        setAnalyzedReviews(analyzedReviewsData);
+        setSentimentStats(statistics);
+        setGoogleAppInfo(prev => ({ ...prev, insights }));
+        // Apple verilerini temizle
+        setAnalyzedAppleReviews([]);
+        setAppleSentimentStats(null);
+        setAppleAppInfo(null);
+      } else {
+        setAnalyzedAppleReviews(analyzedReviewsData);
+        setAppleSentimentStats(statistics);
+        setAppleAppInfo(prev => ({ ...prev, insights }));
+        // Google verilerini temizle
+        setAnalyzedReviews([]);
+        setSentimentStats(null);
+        setGoogleAppInfo(null);
+      }
+
+      // Görüntülenen yorum sayısını sıfırla
+      setVisibleReviewCount(10);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Yorumlar çekilirken bir hata oluştu');
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
       setIsLoading(false);
     }
@@ -332,7 +274,6 @@ export function DashboardView() {
 
   const handlePlatformChange = (platform: Platform) => {
     setSelectedPlatform(platform);
-    // Sadece URL'leri temizle
     setGooglePlayUrl('');
     setAppStoreUrl('');
     setError(null);
@@ -353,7 +294,7 @@ export function DashboardView() {
   };
 
   const handleShowMore = () => {
-    setVisibleReviewCount(prev => Math.min(prev + 10, appleReviews.length));
+    setVisibleReviewCount(prev => Math.min(prev + 10, 50));
   };
 
   const handleShowMoreGoogle = () => {
@@ -475,51 +416,60 @@ export function DashboardView() {
     return keywords.filter(keyword => lowercaseText.includes(keyword));
   };
 
-  const downloadExcel = (platform: 'apple' | 'google') => {
-    const reviews = platform === 'apple' ? analyzedAppleReviews : analyzedReviews;
-    const appInfo = platform === 'apple' ? null : googleAppInfo;
-    
-    // Excel için veriyi hazırla
-    const data = reviews.map(review => {
-      const mainCategory = getMainCategory(review.text);
-      const subCategory = getSubCategory(mainCategory, review.text);
-      const keywords = getKeywords(review.text);
+  const saveAnalysis = async (analysisData: any) => {
+    try {
+      const response = await fetch('/api/save-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(analysisData),
+      });
 
-      return {
-        'Kullanıcı Adı': review.userName,
-        'Puan': review.score,
-        'Yorum': review.text,
-        'Duygu Analizi': getSentimentText(review.sentiment),
-        'Duygu Puanı': getRandomScore(review.sentiment),
-        'Ana Kategori': mainCategory,
-        'Alt Kategori': subCategory,
-        'Anahtar Kelimeler': keywords.join(', '),
-        'Tarih': new Date(review.date).toLocaleDateString('tr-TR')
-      };
-    });
+      if (!response.ok) {
+        throw new Error('Analiz kaydedilemedi');
+      }
+    } catch (error) {
+      console.error('Analiz kaydetme hatası:', error);
+    }
+  };
 
-    // Excel dosyası oluştur
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Yorumlar");
+  const downloadExcel = () => {
+    if (!analyzedReviews.length) return;
 
-    // Sütun genişliklerini ayarla
-    const colWidths = [
-      { wch: 20 }, // Kullanıcı Adı
-      { wch: 8 },  // Puan
-      { wch: 50 }, // Yorum
-      { wch: 15 }, // Duygu Analizi
-      { wch: 12 }, // Duygu Puanı
-      { wch: 15 }, // Ana Kategori
-      { wch: 20 }, // Alt Kategori
-      { wch: 30 }, // Anahtar Kelimeler
-      { wch: 15 }  // Tarih
-    ];
-    ws['!cols'] = colWidths;
+    const workbook = XLSX.utils.book_new();
 
-    // Dosyayı indir
-    const appName = platform === 'apple' ? 'AppStore' : (googleAppInfo?.title || 'GooglePlay');
-    XLSX.writeFile(wb, `${appName}_Yorumlar.xlsx`);
+    // Tüm Yorumlar Sayfası
+    const reviewsData = analyzedReviews.map(review => ({
+      'Yorum Metni': review.text,
+      'Duygu Analizi': getSentimentText(review.sentiment),
+      'Duygu Puanı': getRandomScore(review.sentiment),
+      'Ana Kategori': getMainCategory(review.text),
+      'Alt Kategori': getSubCategory(getMainCategory(review.text), review.text),
+      'Anahtar Kelimeler': getKeywords(review.text).join(', '),
+      'Puan': review.score,
+      'Tarih': new Date(review.date).toLocaleDateString('tr-TR')
+    }));
+
+    const reviewsSheet = XLSX.utils.json_to_sheet(reviewsData);
+    XLSX.utils.book_append_sheet(workbook, reviewsSheet, "Tüm Yorumlar");
+
+    // İstatistikler Sayfası
+    const statsData = [{
+      'Toplam Yorum': sentimentStats?.total || 0,
+      'Olumlu Yorum': sentimentStats?.positive || 0,
+      'Nötr Yorum': sentimentStats?.neutral || 0,
+      'Olumsuz Yorum': sentimentStats?.negative || 0,
+      'Olumlu Oran': `${(((sentimentStats?.positive || 0) / (sentimentStats?.total || 1)) * 100).toFixed(1)}%`,
+      'Nötr Oran': `${(((sentimentStats?.neutral || 0) / (sentimentStats?.total || 1)) * 100).toFixed(1)}%`,
+      'Olumsuz Oran': `${(((sentimentStats?.negative || 0) / (sentimentStats?.total || 1)) * 100).toFixed(1)}%`
+    }];
+
+    const statsSheet = XLSX.utils.json_to_sheet(statsData);
+    XLSX.utils.book_append_sheet(workbook, statsSheet, "İstatistikler");
+
+    // Excel dosyasını indir
+    XLSX.writeFile(workbook, `${googleAppInfo?.title || 'Uygulama'}_Analiz_Raporu.xlsx`);
   };
 
   const getSentimentColor = (sentiment: string) => {
@@ -633,14 +583,30 @@ export function DashboardView() {
             </div>
           </div>
 
-          {/* Analiz Butonu */}
-          <div className="flex justify-end mb-8">
+          {/* Analiz Butonu ve Excel İndirme */}
+          <div className="flex items-center justify-between mb-8">
             <button
               onClick={handleAnalyze}
-              className="px-12 py-5 text-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              disabled={isLoading}
+              className={`
+                px-12 py-5 text-lg bg-gradient-to-br from-blue-500 to-blue-600 
+                text-white rounded-xl shadow-lg hover:shadow-xl 
+                transition-all duration-300 hover:scale-105
+                ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+              `}
             >
-              Yorumları Analiz Et
+              {isLoading ? 'Analiz Yapılıyor...' : 'Analiz Et'}
             </button>
+
+            {analyzedReviews.length > 0 && (
+              <button
+                onClick={downloadExcel}
+                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                <FaFileExcel className="text-xl" />
+                <span>Excel Raporu İndir</span>
+              </button>
+            )}
           </div>
 
           {/* Yükleniyor ve Hata Durumları */}
@@ -657,144 +623,122 @@ export function DashboardView() {
           )}
 
           {/* Analiz Sonuçları */}
-          {(analyzedReviews.length > 0 || analyzedAppleReviews.length > 0) && (
+          {currentReviews.length > 0 && (
             <div className="space-y-6">
-              {/* Yorumlar */}
-              <div className="bg-white rounded-xl p-6 shadow-lg">
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
-                  <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                    <h2 className="text-xl font-semibold text-gray-800">Uygulama Yorumları</h2>
-                    <span className="text-sm text-gray-500">
-                      Toplam {selectedPlatform === 'google' ? analyzedReviews.length : analyzedAppleReviews.length} yorum
-                    </span>
+              {/* İçgörüler */}
+              {currentAppInfo?.insights && (
+                <Card className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                    Analiz İçgörüleri
+                  </h3>
+                  <div className="prose max-w-none">
+                    <p className="text-gray-600 whitespace-pre-line">
+                      {currentAppInfo.insights}
+                    </p>
                   </div>
-                  {(analyzedReviews.length > 0 || analyzedAppleReviews.length > 0) && (
-                    <button
-                      onClick={() => downloadExcel(selectedPlatform)}
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-green-100 text-green-800 rounded-xl hover:bg-green-200 transition-all duration-300 w-full sm:w-auto shadow-md hover:shadow-lg"
-                    >
-                      <FaFileExcel className="text-xl" />
-                      <span className="font-medium">Excel İndir</span>
-                    </button>
-                  )}
-                </div>
+                </Card>
+              )}
+
+              {/* Son Yorumlar */}
+              <Card className="p-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                  Son Yorumlar
+                </h3>
                 <div className="space-y-4">
-                  {(selectedPlatform === 'google' ? analyzedReviews : analyzedAppleReviews)
+                  {currentReviews
                     .slice(0, visibleReviewCount)
-                    .map((review) => {
-                      const mainCategory = getMainCategory(review.text);
-                      const subCategory = getSubCategory(mainCategory, review.text);
-                      const keywords = getKeywords(review.text);
-                      const sentimentScore = getRandomScore(review.sentiment);
+                    .map((review: any, index: number) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-xl ${
+                        review.sentiment === 'positive'
+                          ? 'bg-green-50'
+                          : review.sentiment === 'negative'
+                          ? 'bg-red-50'
+                          : 'bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-600">
+                            {renderStars(review.score)}
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {new Date(review.date).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 mb-3">{review.text}</p>
                       
-                      return (
-                        <div key={review.id} className="flex flex-col gap-4 p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
-                          {/* Üst Kısım - Kullanıcı Bilgisi ve Yıldızlar */}
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                                <span className="text-gray-600 font-medium">{review.userName.charAt(0).toUpperCase()}</span>
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-800">{review.userName}</p>
-                                <p className="text-sm text-gray-500">{new Date(review.date).toLocaleDateString('tr-TR')}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {renderStars(review.score)}
-                            </div>
+                      {/* Analiz Detayları */}
+                      <div className="flex flex-wrap gap-3 mt-2">
+                        {/* Duygu Durumu ve Skoru */}
+                        <div className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+                          review.sentiment === 'positive' 
+                            ? 'bg-green-100 text-green-700' 
+                            : review.sentiment === 'negative'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {getSentimentText(review.sentiment)}
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full">
+                          <span className="text-sm font-medium text-blue-700">Duygu Puanı:</span>
+                          <span className={`text-sm font-bold ${
+                            getRandomScore(review.sentiment) >= 65 
+                              ? 'text-green-600' 
+                              : getRandomScore(review.sentiment) >= 40 
+                              ? 'text-blue-600' 
+                              : 'text-red-600'
+                          }`}>
+                            {getRandomScore(review.sentiment)}
+                          </span>
+                        </div>
+
+                        {/* Ana Kategori ve Alt Kategori */}
+                        <div className="flex flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-500">Ana Kategori:</span>
+                            <span className="px-3 py-1.5 bg-purple-50 rounded-full text-sm font-medium text-purple-700">
+                              {getMainCategory(review.text)}
+                            </span>
                           </div>
-
-                          {/* Yorum İçeriği */}
-                          <p className="text-gray-700">{review.text}</p>
-
-                          {/* Alt Kısım - Analiz Sonuçları */}
-                          <div className="mt-4 space-y-4">
-                            {/* Duygu Analizi ve Puan */}
-                            <div className="flex flex-wrap items-center gap-3">
-                              <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${
-                                review.sentiment === 'positive' 
-                                  ? 'bg-green-100 text-green-700' 
-                                  : review.sentiment === 'negative'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-gray-100 text-gray-700'
-                              }`}>
-                                {getSentimentText(review.sentiment)}
-                              </span>
-                              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full">
-                                <span className="text-sm font-medium text-blue-700">Duygu Puanı:</span>
-                                <span className={`text-sm font-bold ${
-                                  sentimentScore >= 65 
-                                    ? 'text-green-600' 
-                                    : sentimentScore >= 40 
-                                    ? 'text-blue-600' 
-                                    : 'text-red-600'
-                                }`}>
-                                  {sentimentScore}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Kategoriler */}
-                            <div className="flex flex-wrap gap-4">
-                              {/* Ana Kategori */}
-                              <div className="flex flex-col">
-                                <span className="text-xs font-medium text-gray-500 mb-1 ml-1">
-                                  Ana Kategori
-                                </span>
-                                <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-lg">
-                                  <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                                  <span className="text-sm font-medium text-purple-700">
-                                    {mainCategory}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Alt Kategori */}
-                              <div className="flex flex-col">
-                                <span className="text-xs font-medium text-gray-500 mb-1 ml-1">
-                                  Alt Kategori
-                                </span>
-                                <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-200 rounded-lg">
-                                  <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                                  <span className="text-sm font-medium text-indigo-700">
-                                    {subCategory}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Anahtar Kelimeler */}
-                            {keywords.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {keywords.map((keyword, index) => (
-                                  <span 
-                                    key={index}
-                                    className="px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs"
-                                  >
-                                    #{keyword}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-500">Alt Kategori:</span>
+                            <span className="px-3 py-1.5 bg-indigo-50 rounded-full text-sm font-medium text-indigo-700">
+                              {getSubCategory(getMainCategory(review.text), review.text)}
+                            </span>
                           </div>
                         </div>
-                      );
-                    })}
+
+                        {/* Anahtar Kelimeler */}
+                        <div className="flex flex-wrap gap-2">
+                          {getKeywords(review.text).map((keyword, idx) => (
+                            <span 
+                              key={idx}
+                              className="px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs"
+                            >
+                              #{keyword}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Daha Fazla Göster Butonu */}
-                {(selectedPlatform === 'google' ? analyzedReviews.length : analyzedAppleReviews.length) > visibleReviewCount && (
+                {currentReviews.length > visibleReviewCount && (
                   <div className="mt-6 text-center">
                     <button
-                      onClick={() => setVisibleReviewCount(prev => prev + 10)}
-                      className="px-6 py-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all duration-300"
+                      onClick={handleShowMore}
+                      className="px-6 py-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl hover:shadow-lg transition-all duration-300"
                     >
-                      Daha Fazla Göster
+                      Daha Fazla Göster ({Math.min(currentReviews.length - visibleReviewCount, 50 - visibleReviewCount)} yorum)
                     </button>
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
           )}
         </div>

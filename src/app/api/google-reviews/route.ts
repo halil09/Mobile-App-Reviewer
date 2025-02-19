@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         lang: 'tr',
         country: 'tr',
         sort: gplay.sort.NEWEST,
-        num: 100
+        num: 50 // 100'den 50'ye düşürüldü
       }) as ReviewsResult | GooglePlayReview[];
 
       // reviewsResult'ı işle
