@@ -99,6 +99,24 @@ interface AnalyzedAppleReview extends AppleReview {
   };
 }
 
+interface AppleAppInfo {
+  title: string;
+  description: string;
+  score: number;
+  ratings: number;
+  reviews: number;
+  currentVersion: string;
+  developer: string;
+  developerId: string;
+  developerEmail: string;
+  developerWebsite: string;
+  genre: string;
+  price: string;
+  free: boolean;
+  icon: string;
+  insights?: string;
+}
+
 // Yeni chart verileri için yardımcı fonksiyonlar
 const prepareRatingDistributionData = (reviews: GoogleReview[] | AppleReview[]) => {
   const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -142,7 +160,7 @@ export function DashboardView() {
   const [sentimentStats, setSentimentStats] = useState<SentimentStatistics | null>(null);
   const [analyzedAppleReviews, setAnalyzedAppleReviews] = useState<AnalyzedAppleReview[]>([]);
   const [appleSentimentStats, setAppleSentimentStats] = useState<SentimentStatistics | null>(null);
-  const [appleAppInfo, setAppleAppInfo] = useState<any>(null);
+  const [appleAppInfo, setAppleAppInfo] = useState<AppleAppInfo | null>(null);
 
   // Platform'a göre görüntülenecek verileri seç
   const currentReviews = selectedPlatform === 'google' ? analyzedReviews : analyzedAppleReviews;
@@ -249,7 +267,7 @@ export function DashboardView() {
       if (selectedPlatform === 'google') {
         setAnalyzedReviews(analyzedReviewsData);
         setSentimentStats(statistics);
-        setGoogleAppInfo(prev => prev ? {
+        setGoogleAppInfo((prev: GoogleAppInfo | null) => prev ? {
           ...prev,
           insights: insights || prev.insights
         } : null);
@@ -260,7 +278,7 @@ export function DashboardView() {
       } else {
         setAnalyzedAppleReviews(analyzedReviewsData);
         setAppleSentimentStats(statistics);
-        setAppleAppInfo(prev => prev ? {
+        setAppleAppInfo((prev: AppleAppInfo | null) => prev ? {
           ...prev,
           insights: insights || prev.insights
         } : null);
