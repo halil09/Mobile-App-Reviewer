@@ -26,14 +26,15 @@ async function retryOperation<T>(
   maxAttempts: number = 3,
   delay: number = 1000
 ): Promise<T> {
-  let lastError;
+  let lastError: unknown;
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
-      console.log(`Deneme ${attempt}/${maxAttempts} başarısız oldu. ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
+      console.log(`Deneme ${attempt}/${maxAttempts} başarısız oldu. ${errorMessage}`);
       
       if (attempt < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, delay * attempt));
