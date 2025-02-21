@@ -10,7 +10,7 @@ declare global {
   var mongoose: {
     conn: mongoose.Connection | null;
     promise: Promise<mongoose.Connection> | null;
-  } | undefined;
+  };
 }
 
 let cached = global.mongoose;
@@ -20,28 +20,35 @@ if (!cached) {
 }
 
 async function connectDB() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
-      return mongoose;
-    });
-  }
-
   try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    throw e;
-  }
+    if (cached && cached.conn) {
+      console.log('Mevcut MongoDB bağlantısı kullanılıyor');
+      return cached.conn;
+    }
 
-  return cached.conn;
+    if (!cached.promise) {
+      const opts = {
+        bufferCommands: false,
+      };
+
+      cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+        console.log('Yeni MongoDB bağlantısı oluşturuldu');
+        return mongoose;
+      });
+    }
+
+    try {
+      cached.conn = await cached.promise;
+    } catch (e) {
+      cached.promise = null;
+      throw e;
+    }
+
+    return cached.conn;
+  } catch (error) {
+    console.error('MongoDB bağlantı hatası:', error);
+    throw error;
+  }
 }
 
 export default connectDB; 
