@@ -33,8 +33,11 @@ export default function LoginPage() {
         throw new Error(data.error || 'Giriş yapılırken bir hata oluştu');
       }
 
-      // Başarılı giriş
-      router.push('/');
+      // Token'ı manuel olarak cookie'ye kaydet
+      document.cookie = `auth_token=${data.token}; path=/; max-age=86400; samesite=lax`;
+
+      // Başarılı giriş - sayfayı yenile ve ana sayfaya yönlendir
+      window.location.href = '/';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Giriş yapılırken bir hata oluştu');
     } finally {

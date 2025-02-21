@@ -1,23 +1,32 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const authToken = request.cookies.get('auth_token');
   const { pathname } = request.nextUrl;
 
-  // Statik dosyalara ve auth sayfalarına erişime izin ver
+  // Korumasız rotalar
+  const publicPaths = ['/login', '/signup'];
+  const isPublicPath = publicPaths.includes(pathname);
+
+  // API rotaları ve statik dosyalar için kontrol yapma
   if (
     pathname.startsWith('/_next') || // Next.js sistem dosyaları
     pathname.startsWith('/static') || // Statik dosyalar
-    pathname.includes('.') || // Dosya uzantıları (.png, .jpg vb.)
-    pathname === '/login' ||
-    pathname === '/signup'
+    pathname.startsWith('/api/') || // API rotaları
+    pathname.includes('.') // Dosya uzantıları (.png, .jpg vb.)
   ) {
     return NextResponse.next();
   }
 
-  // Diğer tüm sayfalar için giriş kontrolü
-  if (!authToken) {
+  // Eğer public path ise ve token varsa ana sayfaya yönlendir
+  if (isPublicPath && authToken) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  // Eğer public path değilse ve token yoksa login'e yönlendir
+  if (!isPublicPath && !authToken) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -25,5 +34,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!.*\\..*|_next).*)', '/']
 }; 

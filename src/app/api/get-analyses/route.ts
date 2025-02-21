@@ -10,9 +10,9 @@ export async function GET() {
   try {
     await connectDB();
 
-    // Token'ı al ve doğrula
+    // Auth token'ı al
     const token = cookies().get('auth_token')?.value;
-    
+
     if (!token) {
       return NextResponse.json(
         { error: 'Oturum bulunamadı' },
@@ -20,23 +20,45 @@ export async function GET() {
       );
     }
 
-    // Token'dan kullanıcı bilgilerini çıkar
+    // Token'ı doğrula ve kullanıcı bilgilerini al
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
 
-    // Sadece giriş yapmış kullanıcının son 5 analizini getir
+    // Sadece kullanıcının kendi analizlerini getir
     const analyses = await Analysis.find({ userId: decoded.userId })
-      .select('platform appInfo.title statistics createdAt')
       .sort({ createdAt: -1 })
-      .limit(5);
+      .lean();
 
-    return NextResponse.json({ 
-      success: true, 
-      analyses 
+    // Dönen verileri kontrol et
+    console.log('MongoDB\'den alınan analizler:', 
+      analyses.map(analysis => ({
+        id: analysis._id,
+        appInfo: analysis.appInfo,
+        reviewCount: analysis.analyzedReviews?.length,
+        sampleReview: analysis.analyzedReviews?.[0],
+        statistics: analysis.statistics
+      }))
+    );
+
+    // Veri yapısını kontrol et
+    analyses.forEach((analysis, index) => {
+      if (!analysis.analyzedReviews || !Array.isArray(analysis.analyzedReviews)) {
+        console.error(`Hatalı veri yapısı: Analiz ${index + 1}`, analysis);
+      }
     });
+
+    return NextResponse.json({ analyses });
   } catch (error) {
     console.error('Analizleri getirme hatası:', error);
+    
+    if (error instanceof jwt.JsonWebTokenError) {
+      return NextResponse.json(
+        { error: 'Geçersiz oturum' },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Analizler getirilirken bir hata oluştu' },
+      { error: error instanceof Error ? error.message : 'Analizler yüklenirken bir hata oluştu' },
       { status: 500 }
     );
   }

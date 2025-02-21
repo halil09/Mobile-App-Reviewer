@@ -37,26 +37,20 @@ export async function POST(request: Request) {
     }
 
     // JWT token oluştur
-    const token = jwt.sign(
-      { 
-        userId: user._id,
-        username: user.username,
-        role: user.role 
-      },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    const tokenData = { 
+      userId: user._id.toString(),
+      username: user.username,
+      role: user.role 
+    };
+    console.log('Token verisi:', tokenData);
 
-    // Cookie'ye token'ı kaydet
-    cookies().set('auth_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 86400 // 1 gün
-    });
+    const token = jwt.sign(tokenData, JWT_SECRET, { expiresIn: '1d' });
+    console.log('Token oluşturuldu');
 
-    return NextResponse.json({
+    // Response objesi oluştur
+    const response = NextResponse.json({
       success: true,
+      token: token,
       user: {
         id: user._id,
         username: user.username,
@@ -64,6 +58,21 @@ export async function POST(request: Request) {
         role: user.role
       }
     });
+
+    // Cookie'yi response üzerine ekle
+    response.cookies.set({
+      name: 'auth_token',
+      value: token,
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 86400 // 1 gün
+    });
+
+    console.log('Cookie ayarlandı');
+    return response;
+
   } catch (error) {
     console.error('Giriş hatası:', error);
     return NextResponse.json(

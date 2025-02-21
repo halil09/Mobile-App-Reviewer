@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/app-analyzer';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  throw new Error('MongoDB URI tanımlanmamış.');
+  throw new Error('MONGODB_URI ortam değişkeni tanımlanmamış.');
 }
 
 declare global {
@@ -20,10 +20,6 @@ if (!cached) {
 }
 
 async function connectDB() {
-  if (!cached) {
-    cached = global.mongoose = { conn: null, promise: null };
-  }
-
   if (cached.conn) {
     return cached.conn;
   }
@@ -33,8 +29,8 @@ async function connectDB() {
       bufferCommands: false,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose.connection;
+    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+      return mongoose;
     });
   }
 

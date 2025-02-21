@@ -14,24 +14,29 @@ const AnalysisSchema = new mongoose.Schema({
   appInfo: {
     title: String,
     description: String,
+    icon: String,
     score: Number,
     ratings: Number,
     reviews: Number,
     currentVersion: String,
     developer: String,
-    icon: String
+    developerId: String,
+    developerEmail: String,
+    developerWebsite: String,
+    genre: String,
+    price: String,
+    free: Boolean,
+    insights: String
   },
   analyzedReviews: [{
     id: String,
-    userName: String,
-    title: String,
     text: String,
     score: Number,
-    date: Date,
     sentiment: {
       type: String,
       enum: ['positive', 'neutral', 'negative', 'mixed']
     },
+    date: String,
     confidenceScores: {
       positive: Number,
       neutral: Number,
@@ -40,7 +45,8 @@ const AnalysisSchema = new mongoose.Schema({
     mainCategory: String,
     subCategory: String,
     keywords: [String],
-    sentimentScore: Number
+    sentimentScore: Number,
+    userName: String
   }],
   statistics: {
     total: Number,

@@ -7,12 +7,12 @@ import {
   FaChartLine,
   FaBars,
   FaUser,
-  FaCog,
   FaSignOutAlt,
 } from 'react-icons/fa';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { jwtDecode } from "jwt-decode";
 
 interface MenuItem {
   icon: any;
@@ -27,18 +27,22 @@ const menuItems: MenuItem[] = [
   { icon: FaChartLine, label: 'Rakip Analizleri', path: '/competitors' },
 ];
 
-const userProfile = {
-  name: 'TheClico Admin',
-  email: 'admin@theclico.com',
-  role: 'Yönetici',
-  avatar: null,
-};
+interface UserToken {
+  userId: string;
+  username: string;
+  role: string;
+  iat?: number;
+  exp?: number;
+}
 
-interface SidebarProps {}
-
-export function Sidebar({}: SidebarProps) {
+export function Sidebar() {
   const [isMobile, setIsMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState({
+    name: '',
+    username: '',
+    role: ''
+  });
   const pathname = usePathname();
   const router = useRouter();
 
@@ -50,6 +54,62 @@ export function Sidebar({}: SidebarProps) {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const loadUserProfile = () => {
+      try {
+        // Cookie'yi bul
+        const token = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('auth_token='))
+          ?.split('=')[1];
+
+        console.log('Cookie içeriği:', document.cookie);
+        console.log('Bulunan token:', token);
+
+        if (token) {
+          const decoded = jwtDecode<UserToken>(token);
+          console.log('Çözümlenen token:', decoded);
+
+          if (decoded && decoded.username && decoded.role) {
+            console.log('Token geçerli, kullanıcı bilgileri ayarlanıyor:', {
+              username: decoded.username,
+              role: decoded.role
+            });
+            
+            setUserProfile({
+              name: decoded.username,
+              username: decoded.username,
+              role: decoded.role === 'admin' ? 'Yönetici' : 'Kayıtlı Kullanıcı'
+            });
+          } else {
+            console.log('Token içeriği eksik veya geçersiz:', decoded);
+            setUserProfile({
+              name: 'Misafir',
+              username: 'Misafir',
+              role: 'Misafir Kullanıcı'
+            });
+          }
+        } else {
+          console.log('Token bulunamadı');
+          setUserProfile({
+            name: 'Misafir',
+            username: 'Misafir',
+            role: 'Misafir Kullanıcı'
+          });
+        }
+      } catch (error) {
+        console.error('Token çözme hatası:', error);
+        setUserProfile({
+          name: 'Misafir',
+          username: 'Misafir',
+          role: 'Misafir Kullanıcı'
+        });
+      }
+    };
+
+    loadUserProfile();
   }, []);
 
   const handleLogout = async () => {
@@ -66,7 +126,6 @@ export function Sidebar({}: SidebarProps) {
         throw new Error('Çıkış yapılırken bir hata oluştu');
       }
 
-      // Login sayfasına yönlendir
       router.push('/login');
     } catch (error) {
       console.error('Çıkış hatası:', error);
@@ -149,19 +208,11 @@ export function Sidebar({}: SidebarProps) {
           <div className="p-4 mt-auto">
             <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-xl">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
-                {userProfile.avatar ? (
-                  <img 
-                    src={userProfile.avatar} 
-                    alt={userProfile.name}
-                    className="w-full h-full rounded-xl object-cover"
-                  />
-                ) : (
-                  <FaUser className="text-sm" />
-                )}
+                <FaUser className="text-sm" />
               </div>
               <div>
-                <p className="font-medium text-gray-800">{userProfile.name}</p>
-                <p className="text-sm text-blue-600">{userProfile.role}</p>
+                <p className="font-medium text-gray-800">{userProfile.username || 'Yükleniyor...'}</p>
+                <p className="text-sm text-blue-600">{userProfile.role || 'Yükleniyor...'}</p>
               </div>
               <button 
                 onClick={handleLogout}
