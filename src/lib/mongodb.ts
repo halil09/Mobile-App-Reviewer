@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { Connection } from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -8,8 +8,8 @@ if (!MONGODB_URI) {
 
 declare global {
   var mongoose: {
-    conn: mongoose.Connection | null;
-    promise: Promise<mongoose.Connection> | null;
+    conn: Connection | null;
+    promise: Promise<Connection> | null;
   };
 }
 
@@ -19,7 +19,7 @@ if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
-async function connectDB() {
+async function connectDB(): Promise<Connection> {
   try {
     if (cached && cached.conn) {
       console.log('Mevcut MongoDB bağlantısı kullanılıyor');
@@ -33,7 +33,7 @@ async function connectDB() {
 
       cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
         console.log('Yeni MongoDB bağlantısı oluşturuldu');
-        return mongoose;
+        return mongoose.connection;
       });
     }
 
