@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import gplay, { IReviewsItem } from 'google-play-scraper';
 
-interface GooglePlayReview extends IReviewsItem {
+interface GooglePlayReview {
   id: string;
   userName: string;
   text: string;
   score: number;
-  thumbsUp?: number;
+  thumbsUp: number;
   date: string;
   version: string;
 }
@@ -66,21 +66,17 @@ export async function POST(request: Request) {
           lang: 'tr'
         });
 
-        if (!reviewsResult || !reviewsResult.data || !Array.isArray(reviewsResult.data)) {
-          throw new Error('Geçerli yorum dizisi gönderilmedi');
-        }
-
         // Yorumları düzenle
-        const reviews = reviewsResult.data.map(review => ({
+        const reviews = (reviewsResult && Array.isArray(reviewsResult) ? reviewsResult : []).map((review: IReviewsItem) => ({
           id: review.id || String(Math.random()),
           userName: review.userName || 'Anonim',
-          title: review.title || '',
+          title: '',
           text: review.text || '',
           score: review.score || 0,
           thumbsUp: review.thumbsUpCount || 0,
           date: review.date || new Date().toISOString(),
           version: review.version || ''
-        }));
+        } as GooglePlayReview));
 
         return NextResponse.json({
           appInfo: {
