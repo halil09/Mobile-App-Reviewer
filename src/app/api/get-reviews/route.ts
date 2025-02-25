@@ -76,7 +76,7 @@ export async function POST(request: Request) {
           dataLength: reviewsResult?.length || 0
         });
 
-        let reviews = [];
+        let reviews: IReviewsItem[] = [];
 
         if (reviewsResult && typeof reviewsResult === 'object') {
           if (Array.isArray(reviewsResult)) {
