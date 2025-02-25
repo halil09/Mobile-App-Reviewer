@@ -55,7 +55,11 @@ export async function POST(request: Request) {
     if (platform === 'google') {
       try {
         // Google Play Store'dan uygulama bilgilerini al
-        const appInfo = await gplay.app({ appId });
+        const appInfo = await gplay.app({ 
+          appId,
+          lang: 'tr',
+          country: 'tr'
+        });
 
         // Google Play Store'dan yorumları al
         const reviewsResult = await gplay.reviews({
@@ -66,16 +70,43 @@ export async function POST(request: Request) {
           lang: 'tr'
         });
 
+        console.log('Google Play yorumları alındı:', {
+          reviewsType: typeof reviewsResult,
+          isArray: Array.isArray(reviewsResult),
+          dataLength: reviewsResult?.data?.length || reviewsResult?.length || 0
+        });
+
+        let reviews = [];
+
+        if (reviewsResult && typeof reviewsResult === 'object') {
+          // data property'si varsa onu kullan
+          if ('data' in reviewsResult && Array.isArray(reviewsResult.data)) {
+            reviews = reviewsResult.data;
+          }
+          // Direkt array ise onu kullan
+          else if (Array.isArray(reviewsResult)) {
+            reviews = reviewsResult;
+          }
+        }
+
+        if (reviews.length === 0) {
+          console.error('Yorum verisi bulunamadı:', reviewsResult);
+          return NextResponse.json(
+            { error: 'Yorumlar çekilemedi veya hiç yorum bulunamadı' },
+            { status: 404 }
+          );
+        }
+
         // Yorumları düzenle
-        const reviews = (reviewsResult && Array.isArray(reviewsResult) ? reviewsResult : []).map((review: IReviewsItem) => ({
+        const formattedReviews = reviews.map((review: any) => ({
           id: review.id || String(Math.random()),
           userName: review.userName || 'Anonim',
-          title: '',
-          text: review.text || '',
+          title: review.title || '',
+          text: review.text || review.content || '',
           score: review.score || 0,
-          thumbsUp: review.thumbsUpCount || 0,
-          date: review.date || new Date().toISOString(),
-          version: review.version || ''
+          thumbsUp: review.thumbsUpCount || review.thumbsUp || 0,
+          date: review.date ? new Date(review.date).toISOString() : new Date().toISOString(),
+          version: review.version || review.appVersion || ''
         } as GooglePlayReview));
 
         return NextResponse.json({
@@ -95,7 +126,7 @@ export async function POST(request: Request) {
             free: appInfo.free,
             icon: appInfo.icon
           },
-          reviews
+          reviews: formattedReviews
         });
       } catch (error) {
         console.error('Google Play veri çekme hatası:', error);
