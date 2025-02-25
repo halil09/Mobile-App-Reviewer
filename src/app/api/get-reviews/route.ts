@@ -38,13 +38,26 @@ export async function POST(request: Request) {
         const appInfo = await gplay.app({ appId });
 
         // Google Play Store'dan yorumları al
-        const reviews = await gplay.reviews({
+        const reviewsResult = await gplay.reviews({
           appId,
           sort: gplay.sort.NEWEST,
           num: 100,
           country: 'tr',
           lang: 'tr'
         });
+
+        // Yorumları düzenle
+        const reviews = reviewsResult.data.map(review => ({
+          id: review.id || String(Math.random()),
+          userName: review.userName || 'Anonim',
+          title: review.title || '',
+          text: review.text || '',
+          score: review.score || 0,
+          thumbsUp: review.thumbsUp || 0,
+          date: review.date || new Date().toISOString(),
+          version: review.version || '',
+          appVersion: review.appVersion || ''
+        }));
 
         return NextResponse.json({
           appInfo: {
@@ -63,7 +76,7 @@ export async function POST(request: Request) {
             free: appInfo.free,
             icon: appInfo.icon
           },
-          reviews: reviews.data
+          reviews
         });
       } catch (error) {
         console.error('Google Play veri çekme hatası:', error);
