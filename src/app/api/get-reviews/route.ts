@@ -89,54 +89,72 @@ export async function POST(request: Request) {
           throw new Error("Uygulama bulunamadı");
         }
 
-        let reviews = [];
-        let reviewsFetched = false;
+        // RSS feed üzerinden yorumları çek
+        const rssResponse = await fetch(
+          `https://itunes.apple.com/tr/rss/customerreviews/id=${appId}/sortBy=mostRecent/page=1/json`
+        );
 
-        // RSS feed üzerinden yorumları çekmeyi dene
-        try {
-          const rssResponse = await fetch(
-            `https://itunes.apple.com/tr/rss/customerreviews/id=${appId}/sortBy=mostRecent/json`
-          );
-
-          if (rssResponse.ok) {
-            const rssData = await rssResponse.json();
-            
-            if (rssData.feed && Array.isArray(rssData.feed.entry)) {
-              reviews = rssData.feed.entry.map((entry: any) => ({
-                id: entry.id?.label || String(Math.random()),
-                userName: entry.author?.name?.label || 'Anonim',
-                title: entry.title?.label || '',
-                text: entry.content?.label || '',
-                score: parseInt(entry['im:rating']?.label || '0'),
-                date: new Date(entry.updated?.label || Date.now()).toISOString(),
-                version: entry['im:version']?.label || ''
-              }));
-              reviewsFetched = true;
-            }
-          }
-        } catch (error) {
-          console.warn('RSS feed üzerinden yorumlar çekilemedi:', error);
+        if (!rssResponse.ok) {
+          throw new Error("App Store'dan yorumlar çekilemedi");
         }
 
+        const rssData = await rssResponse.json();
+        let reviews = [];
+
+        // Feed yapısını kontrol et ve yorumları işle
+        if (rssData.feed && rssData.feed.entry) {
+          const entries = Array.isArray(rssData.feed.entry) ? rssData.feed.entry : [rssData.feed.entry];
+          
+          reviews = entries
+            .filter(entry => entry && typeof entry === 'object')
+            .map(entry => {
+              try {
+                return {
+                  id: entry.id?.label || String(Math.random()),
+                  userName: entry.author?.name?.label || 'Anonim',
+                  title: entry.title?.label || '',
+                  text: entry.content?.label || '',
+                  score: parseInt(entry['im:rating']?.label || '0', 10),
+                  date: new Date(entry.updated?.label || Date.now()).toISOString(),
+                  version: entry['im:version']?.label || '',
+                  thumbsUp: 0,
+                  replyDate: null,
+                  appVersion: entry['im:version']?.label || ''
+                };
+              } catch (err) {
+                console.warn('Yorum işleme hatası:', err);
+                return null;
+              }
+            })
+            .filter(review => review !== null);
+        }
+
+        // Uygulama bilgilerini hazırla
         const appInfo = {
           title: appName || appInfoData.results[0].trackName,
           description: appInfoData.results[0].description,
           developer: appInfoData.results[0].artistName,
           icon: appInfoData.results[0].artworkUrl100,
-          score: appInfoData.results[0].averageUserRating,
-          ratings: appInfoData.results[0].userRatingCount,
-          reviews: appInfoData.results[0].userRatingCountForCurrentVersion,
+          score: appInfoData.results[0].averageUserRating || 0,
+          ratings: appInfoData.results[0].userRatingCount || 0,
+          reviews: appInfoData.results[0].userRatingCountForCurrentVersion || 0,
           currentVersion: appInfoData.results[0].version,
           price: appInfoData.results[0].formattedPrice,
           genre: appInfoData.results[0].primaryGenreName,
           developerId: appInfoData.results[0].artistId?.toString(),
           developerWebsite: appInfoData.results[0].sellerUrl || '',
-          free: appInfoData.results[0].price === 0
+          free: appInfoData.results[0].price === 0,
+          developerEmail: '',
+          developerId: appInfoData.results[0].artistId?.toString() || ''
         };
+
+        if (reviews.length === 0) {
+          console.warn('Hiç yorum bulunamadı veya yorumlar işlenemedi');
+        }
 
         return NextResponse.json({ 
           appInfo,
-          reviews: reviews.length > 0 ? reviews : []
+          reviews
         });
 
       } catch (error) {
