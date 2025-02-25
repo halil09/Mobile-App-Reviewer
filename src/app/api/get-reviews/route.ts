@@ -62,67 +62,113 @@ export async function POST(request: Request) {
         });
 
         // Google Play Store'dan yorumları al
-        const reviewsResult = await gplay.reviews({
-          appId,
-          sort: gplay.sort.NEWEST,
-          num: 100,
-          country: 'tr',
-          lang: 'tr'
-        });
+        try {
+          console.log('Yorumlar çekiliyor, appId:', appId);
+          const reviewsResult = await gplay.reviews({
+            appId,
+            sort: gplay.sort.NEWEST,
+            num: 50, // 100'den 50'ye düşürüldü
+            country: 'tr',
+            lang: 'tr'
+          });
 
-        console.log('Google Play yorumları alındı:', {
-          reviewsType: typeof reviewsResult,
-          isArray: Array.isArray(reviewsResult),
-          dataLength: reviewsResult?.length || 0
-        });
+          console.log('Google Play yorumları alındı:', {
+            reviewsType: typeof reviewsResult,
+            isArray: Array.isArray(reviewsResult),
+            dataLength: reviewsResult?.length || 0,
+            sampleReview: reviewsResult?.[0] ? JSON.stringify(reviewsResult[0]).slice(0, 100) : 'Yok'
+          });
 
-        let reviews: IReviewsItem[] = [];
+          let reviews: IReviewsItem[] = [];
 
-        if (reviewsResult && typeof reviewsResult === 'object') {
-          if (Array.isArray(reviewsResult)) {
-            reviews = reviewsResult;
+          if (reviewsResult) {
+            if (Array.isArray(reviewsResult)) {
+              reviews = reviewsResult;
+            } else if (typeof reviewsResult === 'object' && 'data' in reviewsResult) {
+              reviews = (reviewsResult as any).data;
+            }
           }
-        }
 
-        if (reviews.length === 0) {
-          console.error('Yorum verisi bulunamadı:', reviewsResult);
+          if (!reviews || reviews.length === 0) {
+            console.error('Yorum verisi bulunamadı. reviewsResult:', 
+              typeof reviewsResult === 'object' ? JSON.stringify(reviewsResult) : reviewsResult
+            );
+            
+            // Alternatif yöntem dene
+            const altReviewsResult = await gplay.reviews({
+              appId,
+              sort: gplay.sort.HELPFULNESS, // Sıralama değiştirildi
+              num: 30, // Sayı azaltıldı
+              country: 'tr',
+              lang: 'tr'
+            });
+
+            if (Array.isArray(altReviewsResult) && altReviewsResult.length > 0) {
+              reviews = altReviewsResult;
+              console.log('Alternatif yöntem başarılı, yorum sayısı:', reviews.length);
+            } else {
+              return NextResponse.json(
+                { error: 'Yorumlar çekilemedi veya hiç yorum bulunamadı' },
+                { status: 404 }
+              );
+            }
+          }
+
+          // Yorumları düzenle
+          const formattedReviews = reviews.map((review: any) => {
+            try {
+              return {
+                id: review.id || String(Math.random()),
+                userName: review.userName || 'Anonim',
+                title: review.title || '',
+                text: review.text || review.content || '',
+                score: typeof review.score === 'number' ? review.score : 0,
+                thumbsUp: review.thumbsUpCount || review.thumbsUp || 0,
+                date: review.date ? new Date(review.date).toISOString() : new Date().toISOString(),
+                version: review.version || review.appVersion || ''
+              } as GooglePlayReview;
+            } catch (err) {
+              console.error('Yorum formatlama hatası:', err);
+              return null;
+            }
+          }).filter(Boolean);
+
+          if (formattedReviews.length === 0) {
+            return NextResponse.json(
+              { error: 'Yorumlar formatlanırken hata oluştu' },
+              { status: 500 }
+            );
+          }
+
+          return NextResponse.json({
+            appInfo: {
+              title: appName || appInfo.title,
+              description: appInfo.description,
+              score: appInfo.score,
+              ratings: appInfo.ratings,
+              reviews: appInfo.reviews,
+              currentVersion: appInfo.version,
+              developer: appInfo.developer,
+              developerId: appInfo.developerId,
+              developerEmail: appInfo.developerEmail,
+              developerWebsite: appInfo.developerWebsite,
+              genre: appInfo.genre,
+              price: appInfo.price,
+              free: appInfo.free,
+              icon: appInfo.icon
+            },
+            reviews: formattedReviews
+          });
+        } catch (error) {
+          console.error('Google Play yorumları çekme hatası:', error);
           return NextResponse.json(
-            { error: 'Yorumlar çekilemedi veya hiç yorum bulunamadı' },
-            { status: 404 }
+            { 
+              error: 'Google Play yorumları çekilirken bir hata oluştu',
+              details: error instanceof Error ? error.message : 'Bilinmeyen hata'
+            },
+            { status: 500 }
           );
         }
-
-        // Yorumları düzenle
-        const formattedReviews = reviews.map((review: any) => ({
-          id: review.id || String(Math.random()),
-          userName: review.userName || 'Anonim',
-          title: review.title || '',
-          text: review.text || review.content || '',
-          score: review.score || 0,
-          thumbsUp: review.thumbsUpCount || review.thumbsUp || 0,
-          date: review.date ? new Date(review.date).toISOString() : new Date().toISOString(),
-          version: review.version || review.appVersion || ''
-        } as GooglePlayReview));
-
-        return NextResponse.json({
-          appInfo: {
-            title: appName || appInfo.title,
-            description: appInfo.description,
-            score: appInfo.score,
-            ratings: appInfo.ratings,
-            reviews: appInfo.reviews,
-            currentVersion: appInfo.version,
-            developer: appInfo.developer,
-            developerId: appInfo.developerId,
-            developerEmail: appInfo.developerEmail,
-            developerWebsite: appInfo.developerWebsite,
-            genre: appInfo.genre,
-            price: appInfo.price,
-            free: appInfo.free,
-            icon: appInfo.icon
-          },
-          reviews: formattedReviews
-        });
       } catch (error) {
         console.error('Google Play veri çekme hatası:', error);
         return NextResponse.json(
