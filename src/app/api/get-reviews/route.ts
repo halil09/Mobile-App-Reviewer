@@ -15,8 +15,7 @@ interface GooglePlayReview {
 }
 
 interface ReviewsResult {
-  data?: GooglePlayReview[];
-  [key: string]: any;
+  data: GooglePlayReview[];
 }
 
 export const dynamic = 'force-dynamic';
@@ -49,14 +48,12 @@ export async function POST(request: Request) {
           country: 'tr',
           sort: gplay.sort.NEWEST,
           num: 50
-        });
+        }) as ReviewsResult;
 
         // reviewsResult'ı işle
         let reviewsArray: GooglePlayReview[] = [];
         
-        if (Array.isArray(reviewsResult)) {
-          reviewsArray = reviewsResult;
-        } else if (reviewsResult && 'data' in reviewsResult && Array.isArray(reviewsResult.data)) {
+        if (reviewsResult && reviewsResult.data && Array.isArray(reviewsResult.data)) {
           reviewsArray = reviewsResult.data;
         }
 
@@ -80,7 +77,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
           appInfo: {
-            title: appName || appInfo.title, // Eğer appName varsa onu kullan
+            title: appName || appInfo.title,
             description: appInfo.summary,
             score: appInfo.score,
             ratings: appInfo.ratings,
