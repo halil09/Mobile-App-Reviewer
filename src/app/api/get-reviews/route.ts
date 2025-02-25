@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         });
 
         // Yorumları düzenle
-        const reviews = (reviewsResult as GooglePlayReview[]).map(review => ({
+        const reviews = reviewsResult.data.map(review => ({
           id: review.id || String(Math.random()),
           userName: review.userName || 'Anonim',
           title: review.title || '',
