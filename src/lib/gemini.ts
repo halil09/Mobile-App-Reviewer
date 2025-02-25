@@ -194,6 +194,16 @@ async function classifyWithGemini(text: string): Promise<string | null> {
 // Mevcut analyzeCategories fonksiyonunu güncelle
 async function analyzeCategories(reviews: (GooglePlayReview | AppStoreReview)[]): Promise<{ [key: string]: number }> {
   const categoryCounts: { [key: string]: number } = {};
+  const categories = {
+    'Performans': ['yavaş', 'donma', 'kasma', 'hızlı', 'çökme', 'bug', 'hata', 'performans'],
+    'Kullanılabilirlik': ['kullanımı', 'arayüz', 'tasarım', 'kolay', 'karmaşık', 'kullanışlı', 'kullanışsız'],
+    'Özellikler & Güncellemeler': ['özellik', 'fonksiyon', 'güncelleme', 'yenilik', 'eklenti', 'versiyon'],
+    'Güvenlik & Gizlilik': ['güvenlik', 'gizlilik', 'şifre', 'hesap', 'oturum', 'login'],
+    'Teknik Sorunlar': ['bağlantı', 'sunucu', 'hata', 'problem', 'sorun', 'çalışmıyor'],
+    'Müşteri Hizmetleri': ['destek', 'yardım', 'iletişim', 'müşteri hizmetleri', 'cevap', 'yanıt'],
+    'Fiyatlandırma & Abonelik': ['ücret', 'fiyat', 'pahalı', 'ücretsiz', 'ödeme', 'abonelik'],
+    'İçerik & Reklamlar': ['içerik', 'reklam', 'kalite', 'bilgi', 'veri']
+  };
 
   for (const review of reviews) {
     try {
@@ -247,12 +257,8 @@ async function analyzeCategories(reviews: (GooglePlayReview | AppStoreReview)[])
       'enfes', 'kusursuz', 'şahane', 'efsane', 'memnun', 'teşekkür', 'bravo', 'tebrik',
       'beğendim', 'sevdim', 'tavsiye ederim', 'öneririm', 'tam not', 'başarılı', 'iyi iş',
       'güzel olmuş', 'iyi', 'hoş', 'keyifli', 'mutlu', 'sevindim', 'memnunum', 'çok güzel',
-      'bayıldım', '👍', '❤️', '😊', '🙂', '♥️', 'süpersin', 'harikasın', 'perfect',
-      'berbat', 'rezalet', 'kötü', 'berbat', 'felaket', 'korkunç', 'vasat', 'yetersiz',
-      'başarısız', 'beğenmedim', 'sevmedim', 'pişman', 'tavsiye etmem', 'önermem', 'sıfır',
-      'boşuna', 'zaman kaybı', 'hayal kırıklığı', 'memnun değilim', 'işe yaramaz',
-      'berbat olmuş', 'çöp', 'kötü olmuş', 'facia', 'rezil', 'berbat', 'saçma',
-      'beğenmedim', '👎', '😠', '😡', '🤬', '💩', 'worst', 'terrible'];
+      'bayıldım', '👍', '❤️', '😊', '🙂', '♥️', 'süpersin', 'harikasın', 'perfect'];
+
     if (customerSatisfactionKeywords.some(keyword => {
       // Kelime veya emoji kontrolü
       if (keyword.match(/[\u{1F300}-\u{1F9FF}]|[\u{2700}-\u{27BF}]|[\u{2600}-\u{26FF}]/u)) {
@@ -273,11 +279,8 @@ async function analyzeCategories(reviews: (GooglePlayReview | AppStoreReview)[])
     if (!foundCategory) {
       for (const [category, keywords] of Object.entries(categories)) {
         if (category === 'Müşteri Memnuniyeti') continue;
-        
+
         if (keywords.some(keyword => {
-          if (keyword.match(/[\u{1F300}-\u{1F9FF}]|[\u{2700}-\u{27BF}]|[\u{2600}-\u{26FF}]/u)) {
-            return text.includes(keyword);
-          }
           if (keyword.includes(' ')) {
             return containsPhrase(text, keyword);
           }
@@ -290,21 +293,7 @@ async function analyzeCategories(reviews: (GooglePlayReview | AppStoreReview)[])
       }
     }
 
-    // Eğer hiçbir kategori bulunamadıysa ve yorum çok kısaysa Müşteri Memnuniyeti'ne ekle
-    if (!foundCategory && cleanText(text).split(' ').length <= 3) {
-      const positiveWords = ['iyi', 'güzel', 'süper', 'harika', '👍', '❤️', 'teşekkür'];
-      const negativeWords = ['kötü', 'berbat', 'rezalet', '👎', '😠'];
-      
-      const hasPositive = positiveWords.some(word => containsWord(text, word));
-      const hasNegative = negativeWords.some(word => containsWord(text, word));
-      
-      if (hasPositive || hasNegative) {
-        categoryCounts['Müşteri Memnuniyeti'] = (categoryCounts['Müşteri Memnuniyeti'] || 0) + 1;
-        foundCategory = true;
-      }
-    }
-
-    // Hala hiçbir kategori bulunamadıysa Diğer'e ekle
+    // Eğer hiçbir kategori bulunamadıysa "Diğer" kategorisine ekle
     if (!foundCategory) {
       categoryCounts['Diğer'] = (categoryCounts['Diğer'] || 0) + 1;
     }
