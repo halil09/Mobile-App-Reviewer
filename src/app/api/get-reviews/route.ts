@@ -18,6 +18,16 @@ interface ReviewsResult {
   data: GooglePlayReview[];
 }
 
+interface AppStoreReviewEntry {
+  id?: { label: string };
+  author?: { name?: { label: string } };
+  title?: { label: string };
+  content?: { label: string };
+  'im:rating'?: { label: string };
+  updated?: { label: string };
+  'im:version'?: { label: string };
+}
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
@@ -119,8 +129,8 @@ export async function POST(request: Request) {
           const entries = Array.isArray(rssData.feed.entry) ? rssData.feed.entry : [rssData.feed.entry];
           
           reviews = entries
-            .filter(entry => entry && typeof entry === 'object')
-            .map(entry => {
+            .filter((entry: AppStoreReviewEntry) => entry && typeof entry === 'object')
+            .map((entry: AppStoreReviewEntry) => {
               try {
                 return {
                   id: entry.id?.label || String(Math.random()),
@@ -139,7 +149,7 @@ export async function POST(request: Request) {
                 return null;
               }
             })
-            .filter(review => review !== null);
+            .filter((review): review is NonNullable<typeof review> => review !== null);
         }
 
         // Uygulama bilgilerini hazırla
