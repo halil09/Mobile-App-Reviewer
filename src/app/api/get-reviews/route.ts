@@ -177,11 +177,10 @@ export async function POST(request: Request) {
           currentVersion: appInfoData.results[0].version,
           price: appInfoData.results[0].formattedPrice,
           genre: appInfoData.results[0].primaryGenreName,
-          developerId: appInfoData.results[0].artistId?.toString(),
+          developerId: appInfoData.results[0].artistId?.toString() || '',
           developerWebsite: appInfoData.results[0].sellerUrl || '',
           free: appInfoData.results[0].price === 0,
-          developerEmail: '',
-          developerId: appInfoData.results[0].artistId?.toString() || ''
+          developerEmail: ''
         };
 
         if (reviews.length === 0) {
