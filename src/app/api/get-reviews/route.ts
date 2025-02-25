@@ -73,18 +73,13 @@ export async function POST(request: Request) {
         console.log('Google Play yorumları alındı:', {
           reviewsType: typeof reviewsResult,
           isArray: Array.isArray(reviewsResult),
-          dataLength: reviewsResult?.data?.length || reviewsResult?.length || 0
+          dataLength: reviewsResult?.length || 0
         });
 
         let reviews = [];
 
         if (reviewsResult && typeof reviewsResult === 'object') {
-          // data property'si varsa onu kullan
-          if ('data' in reviewsResult && Array.isArray(reviewsResult.data)) {
-            reviews = reviewsResult.data;
-          }
-          // Direkt array ise onu kullan
-          else if (Array.isArray(reviewsResult)) {
+          if (Array.isArray(reviewsResult)) {
             reviews = reviewsResult;
           }
         }
