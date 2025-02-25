@@ -28,6 +28,19 @@ interface AppStoreReviewEntry {
   'im:version'?: { label: string };
 }
 
+interface AppStoreReview {
+  id: string;
+  userName: string;
+  title: string;
+  text: string;
+  score: number;
+  date: string;
+  version: string;
+  thumbsUp: number;
+  replyDate: null;
+  appVersion: string;
+}
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
@@ -143,13 +156,13 @@ export async function POST(request: Request) {
                   thumbsUp: 0,
                   replyDate: null,
                   appVersion: entry['im:version']?.label || ''
-                };
+                } as AppStoreReview;
               } catch (err) {
                 console.warn('Yorum işleme hatası:', err);
                 return null;
               }
             })
-            .filter((review): review is NonNullable<typeof review> => review !== null);
+            .filter((review: AppStoreReview | null): review is AppStoreReview => review !== null);
         }
 
         // Uygulama bilgilerini hazırla
