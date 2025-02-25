@@ -448,117 +448,134 @@ export function DashboardView() {
 
   const getGoogleAppIdFromUrl = (url: string) => {
     const match = url.match(/id=([^&]+)/);
-    return match ? match[1] : null;
+    const appId = match ? match[1] : null;
+    
+    // Uygulama adını çıkar
+    if (appId) {
+      const appName = appId.split('com.')[1];
+      if (appName) {
+        // İlk harfi büyük yap
+        return {
+          id: appId,
+          name: appName.charAt(0).toUpperCase() + appName.slice(1)
+        };
+      }
+    }
+    return null;
   };
 
   const handleAnalyze = async () => {
-    setIsLoading(true);
-    setError(null);
-    
     try {
-      let reviewsData;
-      let appInfo;
+      setIsLoading(true);
+      setError(null);
+
+      let appId;
+      let appName;
 
       if (selectedPlatform === 'google') {
-        // Google Play'den yorumları çek
-        const reviewsResponse = await fetch('/api/google-reviews', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ appId: appUrl }),
-        });
-
-        if (!reviewsResponse.ok) {
-          throw new Error('Yorumlar çekilemedi');
+        const googleAppData = getGoogleAppIdFromUrl(appUrl);
+        if (!googleAppData) {
+          throw new Error('Geçersiz Google Play Store URL\'si');
         }
-
-        reviewsData = await reviewsResponse.json();
-        appInfo = {
-          title: getAppNameFromUrl(appUrl),
-          description: '',
-          score: 0,
-          ratings: 0,
-          reviews: 0,
-          currentVersion: '',
-          developer: '',
-          developerId: '',
-          developerEmail: '',
-          developerWebsite: '',
-          genre: '',
-          price: '',
-          free: true,
-          icon: '',
-        };
+        appId = googleAppData.id;
+        appName = googleAppData.name;
       } else {
-        // App Store'dan yorumları çek
-        const appId = getAppIdFromUrl(appUrl);
+        appId = getAppIdFromUrl(appUrl);
         if (!appId) {
-          throw new Error('Geçerli bir App Store URLsi giriniz');
+          throw new Error('Geçersiz App Store URL\'si');
         }
-
-        const reviewsResponse = await fetch('/api/reviews', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ appId }),
-        });
-
-        if (!reviewsResponse.ok) {
-          throw new Error('Yorumlar çekilemedi');
-        }
-
-        const response = await reviewsResponse.json();
-        reviewsData = { reviews: response.reviews };
-        appInfo = response.appInfo;
       }
-        
-      // Duygu analizi yap
-      const sentimentResponse = await fetch('/api/sentiment-analysis', {
+
+      // Yorumları getir
+      const response = await fetch('/api/get-reviews', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ reviews: reviewsData.reviews }),
+        body: JSON.stringify({
+          platform: selectedPlatform,
+          appId,
+          appName // Uygulama adını da gönder
+        }),
       });
 
-      if (!sentimentResponse.ok) {
-        throw new Error('Duygu analizi yapılamadı');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Yorumlar çekilirken bir hata oluştu');
       }
 
-      const { reviews: analyzedReviewsData, statistics: statsData } = await sentimentResponse.json();
+      const reviewsData = await response.json();
 
-      // İçgörü özetini oluştur
-      const insights = await generateInsights(analyzedReviewsData, statsData);
+      // Duygu analizi yap
+      try {
+        const sentimentResponse = await fetch('/api/sentiment-analysis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reviews: reviewsData.reviews.map((review: any) => ({
+              id: review.id,
+              text: review.text
+            }))
+          }),
+        });
 
-      // Uygulama bilgilerini güncelle
-      if (selectedPlatform === 'google') {
-        setGoogleAppInfo({
-          ...appInfo,
-          score: calculateAverageRating(analyzedReviewsData),
-          ratings: analyzedReviewsData.length,
-          reviews: analyzedReviewsData.length,
-          insights: insights
-        });
-      } else {
-        setAppleAppInfo({
-          ...appInfo,
-          insights: insights
-        });
+        if (!sentimentResponse.ok) {
+          const errorData = await sentimentResponse.json();
+          throw new Error(errorData.error || 'Duygu analizi yapılırken bir hata oluştu');
+        }
+
+        const sentimentData = await sentimentResponse.json();
+
+        // Analiz sonuçlarını birleştir
+        const analyzedReviews = reviewsData.reviews.map((review: any, index: number) => ({
+          ...review,
+          ...sentimentData.reviews[index]
+        }));
+
+        // İstatistikleri güncelle
+        setStatistics(sentimentData.statistics);
+
+        // Kategorileri analiz et ve güncelle
+        const categoryData = await analyzeCategories(analyzedReviews);
+        setCategories(categoryData);
+
+        // Trend verilerini hazırla ve güncelle
+        const trendData = prepareSentimentTrendData(analyzedReviews);
+        setSentimentTrend(trendData);
+
+        // Uygulama bilgilerini güncelle
+        if (selectedPlatform === 'google') {
+          setGoogleAppInfo({
+            ...reviewsData.appInfo,
+            score: calculateAverageRating(analyzedReviews),
+            ratings: analyzedReviews.length,
+            reviews: analyzedReviews.length
+          });
+        } else {
+          setAppleAppInfo(reviewsData.appInfo);
+        }
+
+        // Analiz edilmiş yorumları güncelle
+        setAnalyzedReviews(analyzedReviews);
+
+        // İçgörüleri oluştur
+        const insights = await generateInsights(analyzedReviews, sentimentData.statistics);
+        
+        // Uygulama bilgilerini güncelle
+        if (selectedPlatform === 'google') {
+          setGoogleAppInfo(prev => prev ? { ...prev, insights } : null);
+        } else {
+          setAppleAppInfo(prev => prev ? { ...prev, insights } : null);
+        }
+
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Duygu analizi yapılırken bir hata oluştu');
+        return;
       }
-
-      // Diğer state'leri güncelle
-      setAnalyzedReviews(analyzedReviewsData);
-      setStatistics(statsData);
-      setCategories(analyzeCategories(analyzedReviewsData));
-
-      // Trend verilerini güncelle
-      const trendData = prepareSentimentTrendData(analyzedReviewsData);
-      setSentimentTrend(trendData);
 
     } catch (error) {
-      console.error('Analiz hatası:', error);
       setError(error instanceof Error ? error.message : 'Analiz yapılırken bir hata oluştu');
     } finally {
       setIsLoading(false);
@@ -711,32 +728,79 @@ export function DashboardView() {
 
       alert('Analiz başarıyla kaydedildi!');
     } catch (error) {
-      console.error('Analiz kaydetme hatası:', error);
       alert('Analiz kaydedilirken bir hata oluştu');
     }
   };
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
     if (!analyzedReviews.length) return;
 
     const workbook = XLSX.utils.book_new();
 
+    // Kategorileri analiz et
+    const reviewCategories = await analyzeCategories([...analyzedReviews]);
+
     // Tüm Yorumlar Sayfası
-    const reviewsData = analyzedReviews.map(review => ({
-      'Yorum Metni': review.text,
-      'Duygu Analizi': getSentimentText(review.sentiment),
-      'Duygu Puanı': getRandomScore(review.sentiment),
-      'Ana Kategori': getMainCategory(review.text),
-      'Alt Kategori': getSubCategory(getMainCategory(review.text), review.text),
-      'Anahtar Kelimeler': getKeywords(review.text).join(', '),
-      'Puan': review.score,
-      'Tarih': new Date(review.date).toLocaleDateString('tr-TR')
-    }));
+    const reviewsData = analyzedReviews.map(review => {
+      // Her yorum için kategoriyi belirle
+      const reviewText = review.text.toLowerCase();
+      let category = 'Diğer';
+      
+      // Müşteri Memnuniyeti kontrolü
+      const customerSatisfactionKeywords = [
+        'süper', 'harika', 'mükemmel', 'muhteşem', 'çok iyi', 'başarılı', 'güzel',
+        'berbat', 'rezalet', 'kötü', 'felaket', 'korkunç', 'vasat', 'yetersiz'
+      ];
+      
+      if (customerSatisfactionKeywords.some(keyword => reviewText.includes(keyword)) ||
+          (reviewText.split(' ').length <= 3 && (reviewText.includes('👍') || reviewText.includes('👎')))) {
+        category = 'Müşteri Memnuniyeti';
+      } else {
+        // Diğer kategorileri kontrol et
+        const categories = {
+          'Performans': ['yavaş', 'donma', 'kasma', 'gecikme', 'çökme', 'bug', 'hata'],
+          'Kullanılabilirlik': ['kullanımı', 'arayüz', 'tasarım', 'menü', 'kolay', 'karmaşık'],
+          'Özellikler': ['özellik', 'fonksiyon', 'güncelleme', 'yenilik'],
+          'Güvenlik': ['güvenlik', 'gizlilik', 'şifre', 'hesap']
+        };
+
+        for (const [cat, keywords] of Object.entries(categories)) {
+          if (keywords.some(keyword => reviewText.includes(keyword))) {
+            category = cat;
+            break;
+          }
+        }
+      }
+
+      return {
+        'Yorum Metni': review.text,
+        'Duygu Analizi': getSentimentText(review.sentiment),
+        'Duygu Puanı': getRandomScore(review.sentiment),
+        'Ana Kategori': category,
+        'Alt Kategori': category === 'Müşteri Memnuniyeti' ? 
+          (review.sentiment === 'positive' ? 'Olumlu Geri Bildirim' : 
+           review.sentiment === 'negative' ? 'Olumsuz Geri Bildirim' : 'Nötr Geri Bildirim') : 
+          'Genel',
+        'Anahtar Kelimeler': getKeywords(review.text).join(', '),
+        'Puan': review.score,
+        'Tarih': new Date(review.date).toLocaleDateString('tr-TR')
+      };
+    });
 
     const reviewsSheet = XLSX.utils.json_to_sheet(reviewsData);
     XLSX.utils.book_append_sheet(workbook, reviewsSheet, "Tüm Yorumlar");
 
-    // İstatistikler Sayfası
+    // Kategori İstatistikleri Sayfası
+    const categoryStats = Object.entries(reviewCategories).map(([category, count]) => ({
+      'Kategori': category,
+      'Yorum Sayısı': count,
+      'Oran': `${((count / analyzedReviews.length) * 100).toFixed(1)}%`
+    }));
+
+    const categorySheet = XLSX.utils.json_to_sheet(categoryStats);
+    XLSX.utils.book_append_sheet(workbook, categorySheet, "Kategori İstatistikleri");
+
+    // Duygu Analizi İstatistikleri Sayfası
     const statsData = [{
       'Toplam Yorum': statistics?.total || 0,
       'Olumlu Yorum': statistics?.positive || 0,
@@ -748,7 +812,7 @@ export function DashboardView() {
     }];
 
     const statsSheet = XLSX.utils.json_to_sheet(statsData);
-    XLSX.utils.book_append_sheet(workbook, statsSheet, "İstatistikler");
+    XLSX.utils.book_append_sheet(workbook, statsSheet, "Duygu Analizi İstatistikleri");
 
     // Excel dosyasını indir
     XLSX.writeFile(workbook, `${googleAppInfo?.title || 'Uygulama'}_Analiz_Raporu.xlsx`);
@@ -800,16 +864,6 @@ export function DashboardView() {
                 <option value="google">Google Play Store</option>
                 <option value="apple">App Store</option>
               </select>
-              
-              {analyzedReviews.length > 0 && (
-                <button
-                  onClick={downloadExcel}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
-                >
-                  <FaFileExcel />
-                  Excel Olarak İndir
-                </button>
-              )}
             </div>
           </div>
 
@@ -843,8 +897,42 @@ export function DashboardView() {
           </div>
 
           {/* Analiz Sonuçları */}
-          {(googleAppInfo || appleAppInfo) && (
+          {analyzedReviews.length > 0 && (
             <div className="space-y-6">
+              {/* Excel ve Kaydetme Butonları */}
+              <div className="flex gap-4 justify-end">
+                <button
+                  onClick={() => saveAnalysis({
+                    platform: selectedPlatform,
+                    appInfo: selectedPlatform === 'google' ? googleAppInfo : appleAppInfo,
+                    analyzedReviews
+                  })}
+                  disabled={isLoading}
+                  className={`
+                    px-6 py-2 rounded-xl text-white
+                    bg-blue-500 hover:bg-blue-600
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                    transition-all duration-300
+                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                >
+                  {isLoading ? 'Kaydediliyor...' : 'Analizi Kaydet'}
+                </button>
+                <button
+                  onClick={downloadExcel}
+                  disabled={!analyzedReviews.length}
+                  className={`
+                    px-6 py-2 rounded-xl text-white
+                    bg-green-500 hover:bg-green-600
+                    focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
+                    transition-all duration-300
+                    ${!analyzedReviews.length ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                >
+                  Excel Olarak İndir
+                </button>
+              </div>
+
               {/* Uygulama Bilgileri */}
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <div className="flex items-start gap-4">
@@ -896,28 +984,6 @@ export function DashboardView() {
                   <ReviewCountTrendChart analyzedReviews={analyzedReviews} />
                 </div>
               </div>
-
-              {/* Analizi Kaydet Butonu */}
-              <div className="flex justify-end mt-6">
-                <button
-                  onClick={() => saveAnalysis({
-                    platform: selectedPlatform,
-                    appInfo: selectedPlatform === 'google' ? googleAppInfo : appleAppInfo,
-                    analyzedReviews
-                  })}
-                  disabled={isLoading}
-                  className={`
-                    px-6 py-3 text-white rounded-xl
-                    bg-gradient-to-br from-blue-500 to-blue-600
-                    hover:from-blue-600 hover:to-blue-700
-                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-                    transition-all duration-300
-                    ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
-                >
-                  {isLoading ? 'Kaydediliyor...' : 'Analizi Kaydet'}
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -929,6 +995,20 @@ export function DashboardView() {
 // Kategori analizi yardımcı fonksiyonu
 function analyzeCategories(reviews: AnalyzedReview[]): { [key: string]: number } {
   const categories = {
+    'Müşteri Memnuniyeti': [
+      // Olumlu ifadeler
+      'süper', 'harika', 'mükemmel', 'muhteşem', 'çok iyi', 'başarılı', 'güzel', 'fevkalade',
+      'enfes', 'kusursuz', 'şahane', 'efsane', 'memnun', 'teşekkür', 'bravo', 'tebrik',
+      'beğendim', 'sevdim', 'tavsiye ederim', 'öneririm', 'tam not', 'başarılı', 'iyi iş',
+      'güzel olmuş', 'iyi', 'hoş', 'keyifli', 'mutlu', 'sevindim', 'memnunum', 'çok güzel',
+      'bayıldım', '👍', '❤️', '😊', '🙂', '♥️', 'süpersin', 'harikasın', 'perfect',
+      // Olumsuz ifadeler
+      'berbat', 'rezalet', 'kötü', 'berbat', 'felaket', 'korkunç', 'vasat', 'yetersiz',
+      'başarısız', 'beğenmedim', 'sevmedim', 'pişman', 'tavsiye etmem', 'önermem', 'sıfır',
+      'boşuna', 'zaman kaybı', 'hayal kırıklığı', 'memnun değilim', 'işe yaramaz',
+      'berbat olmuş', 'çöp', 'kötü olmuş', 'facia', 'rezil', 'berbat', 'saçma',
+      'beğenmedim', '👎', '😠', '😡', '🤬', '💩', 'worst', 'terrible'
+    ],
     'Performans': ['yavaş', 'donma', 'kasma', 'gecikme', 'çökme', 'bug', 'hata'],
     'Kullanılabilirlik': ['kullanımı', 'arayüz', 'tasarım', 'menü', 'kolay', 'karmaşık'],
     'Özellikler': ['özellik', 'fonksiyon', 'güncelleme', 'yenilik'],
@@ -938,18 +1018,95 @@ function analyzeCategories(reviews: AnalyzedReview[]): { [key: string]: number }
 
   const categoryCounts: { [key: string]: number } = {};
 
+  // Metni temizleyen yardımcı fonksiyon
+  const cleanText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .replace(/[.,!?;:'"]/g, ' ') // Noktalama işaretlerini boşluğa çevir
+      .replace(/\s+/g, ' ')        // Birden fazla boşluğu teke indir
+      .trim();
+  };
+
+  // Kelime sınırlarını kontrol eden yardımcı fonksiyon
+  const containsWord = (text: string, word: string): boolean => {
+    // Emoji kontrolü
+    if (word.match(/[\u{1F300}-\u{1F9FF}]|[\u{2700}-\u{27BF}]|[\u{2600}-\u{26FF}]/u)) {
+      return text.includes(word);
+    }
+    
+    // Metni ve aranacak kelimeyi temizle
+    const cleanedText = cleanText(text);
+    const cleanedWord = cleanText(word);
+    
+    // Kelime sınırlarını kontrol et
+    return cleanedText.split(' ').some(w => w === cleanedWord);
+  };
+
+  // Birden fazla kelimeden oluşan ifadeleri kontrol eden fonksiyon
+  const containsPhrase = (text: string, phrase: string): boolean => {
+    const cleanedText = cleanText(text);
+    const cleanedPhrase = cleanText(phrase);
+    return cleanedText.includes(cleanedPhrase);
+  };
+
   reviews.forEach(review => {
     const text = review.text.toLowerCase();
     let foundCategory = false;
 
-    for (const [category, keywords] of Object.entries(categories)) {
-      if (keywords.some(keyword => text.includes(keyword))) {
-        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
-        foundCategory = true;
-        break;
+    // Önce Müşteri Memnuniyeti kategorisini kontrol et
+    const customerSatisfactionKeywords = categories['Müşteri Memnuniyeti'];
+    if (customerSatisfactionKeywords.some(keyword => {
+      // Kelime veya emoji kontrolü
+      if (keyword.match(/[\u{1F300}-\u{1F9FF}]|[\u{2700}-\u{27BF}]|[\u{2600}-\u{26FF}]/u)) {
+        return text.includes(keyword);
+      }
+      // Çok kelimeli ifade kontrolü
+      if (keyword.includes(' ')) {
+        return containsPhrase(text, keyword);
+      }
+      // Tek kelime kontrolü
+      return containsWord(text, keyword);
+    })) {
+      categoryCounts['Müşteri Memnuniyeti'] = (categoryCounts['Müşteri Memnuniyeti'] || 0) + 1;
+      foundCategory = true;
+    }
+
+    // Diğer kategorileri kontrol et
+    if (!foundCategory) {
+      for (const [category, keywords] of Object.entries(categories)) {
+        if (category === 'Müşteri Memnuniyeti') continue;
+        
+        if (keywords.some(keyword => {
+          if (keyword.match(/[\u{1F300}-\u{1F9FF}]|[\u{2700}-\u{27BF}]|[\u{2600}-\u{26FF}]/u)) {
+            return text.includes(keyword);
+          }
+          if (keyword.includes(' ')) {
+            return containsPhrase(text, keyword);
+          }
+          return containsWord(text, keyword);
+        })) {
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+          foundCategory = true;
+          break;
+        }
       }
     }
 
+    // Eğer hiçbir kategori bulunamadıysa ve yorum çok kısaysa Müşteri Memnuniyeti'ne ekle
+    if (!foundCategory && cleanText(text).split(' ').length <= 3) {
+      const positiveWords = ['iyi', 'güzel', 'süper', 'harika', '👍', '❤️', 'teşekkür'];
+      const negativeWords = ['kötü', 'berbat', 'rezalet', '👎', '😠'];
+      
+      const hasPositive = positiveWords.some(word => containsWord(text, word));
+      const hasNegative = negativeWords.some(word => containsWord(text, word));
+      
+      if (hasPositive || hasNegative) {
+        categoryCounts['Müşteri Memnuniyeti'] = (categoryCounts['Müşteri Memnuniyeti'] || 0) + 1;
+        foundCategory = true;
+      }
+    }
+
+    // Hala hiçbir kategori bulunamadıysa Diğer'e ekle
     if (!foundCategory) {
       categoryCounts['Diğer'] = (categoryCounts['Diğer'] || 0) + 1;
     }

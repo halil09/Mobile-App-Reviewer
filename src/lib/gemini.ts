@@ -33,8 +33,6 @@ async function retryOperation<T>(
       return await operation();
     } catch (error) {
       lastError = error;
-      const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
-      console.log(`Deneme ${attempt}/${maxAttempts} başarısız oldu. ${errorMessage}`);
       
       if (attempt < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, delay * attempt));
@@ -95,9 +93,6 @@ export async function generateInsights(analysisData: any) {
 
     return result.text();
   } catch (error) {
-    console.error('İçgörü oluşturma hatası:', error);
-    
-    // API hatası durumunda yedek içgörü metnini döndür
     return generateFallbackInsights(analysisData);
   }
 }
@@ -146,88 +141,174 @@ function formatAnalysisData(data: any) {
   `;
 }
 
-function analyzeCategories(reviews: (GooglePlayReview | AppStoreReview)[]): { [key: string]: number } {
-  const categories = {
-    'Performans': [
-      'yavaş', 'donma', 'kasma', 'gecikme', 'lag', 'hızlı', 'akıcı', 'stabil', 'performans', 
-      'çökme', 'bug', 'hata', 'optimizasyon', 'yüksek FPS', 'takılma', 'yüklenme süresi', 
-      'frame drop', 'fps düşüşü', 'pil tüketimi', 'ısınma', 'yükleme süresi', 'sistem kullanımı', 
-      'RAM tüketimi', 'CPU kullanımı'
-    ],
-    
-    'Kullanılabilirlik': [
-      'kullanımı', 'arayüz', 'UI', 'UX', 'tasarım', 'menü', 'düzen', 'karmaşık', 'basit', 
-      'kolay', 'sezgisel', 'kullanıcı deneyimi', 'anlaşılır', 'kullanışlı', 'karışık', 
-      'erişilebilirlik', 'görsel tasarım', 'tema', 'dark mode', 'renkler', 'buton', 'navigasyon', 
-      'scroll', 'font boyutu', 'okunabilirlik', 'dokunmatik hassasiyeti', 'gesture kontrolü', 
-      'ekran boyutuna uyum'
-    ],
-    
-    'Özellikler & Güncellemeler': [
-      'özellik', 'fonksiyon', 'seçenek', 'yenilik', 'güncelleme', 'beta', 'yeni sürüm', 'mod', 
-      'ekstra', 'eksik', 'ekleme', 'iyileştirme', 'özelleştirme', 'widget', 'entegre', 'plugin', 
-      'modül', 'feedback', 'özellik kaldırıldı', 'geri getirilmesi gereken özellik', 'yeni araçlar', 
-      'kullanıcı talepleri', 'AI entegrasyonu', 'offline kullanım'
-    ],
-    
-    'Güvenlik & Gizlilik': [
-      'güvenlik', 'gizlilik', 'şifre', 'hesap', 'doğrulama', 'hata', 'giriş', 'kimlik', 
-      'data breach', 'hacklenme', 'açık', 'güvenlik açığı', 'kişisel veri', 'kimlik avı', 
-      'yetkilendirme', 'token', 'biometrik', 'çift aşamalı doğrulama', 'OTP', 'hesap çalındı', 
-      'çerez politikası', 'VPN uyumluluğu', 'şifreleme', 'anonimlik', 'izinler', 'konum erişimi', 
-      'arka planda izleme'
-    ],
-    
-    'Teknik Sorunlar': [
-      'bağlantı', 'internet', 'wifi', 'mobil veri', 'sunucu', 'hata', 'çöküyor', 'açılmıyor', 
-      'bağlanmıyor', 'ağ hatası', 'server error', 'timeout', 'yükleme hatası', '403', '404', 
-      '500', 'beklenmeyen hata', 'yanıt vermiyor', 'bağlantı koptu', 'ping', 'düşük hız', 
-      'server down', 'VPN ile çalışmıyor', 'DNS hatası', 'sistem erişimi', 'offline çalışmıyor', 
-      'uygulama çakışması', 'arka planda çalışmıyor'
-    ],
-    
-    'Müşteri Hizmetleri': [
-      'destek', 'yardım', 'iletişim', 'çözüm', 'yanıt', 'şikayet', 'cevap alamıyorum', 
-      'geç dönüş', 'destek ekibi', 'canlı destek', 'ticket', 'e-posta', 'müşteri ilişkileri', 
-      'şikayet var', 'geri bildirim', 'moderasyon', 'destek sistemi', 'otomatik yanıt', 
-      'canlı sohbet', 'sosyal medya desteği', 'topluluk yönetimi', 'hataların raporlanması'
-    ],
-    
-    'Fiyatlandırma & Abonelik': [
-      'ücret', 'fiyat', 'pahalı', 'ucuz', 'ödeme', 'satın alma', 'abonelik', 'fiyat politikası', 
-      'free trial', 'premium', 'reklam kaldırma', 'iade', 'parayı hak etmiyor', 'tahsilat', 
-      'yanıltıcı fiyatlandırma', 'faturalandırma', 'ödeme hatası', 'tek seferlik ödeme', 
-      'abonelik iptali', 'zorunlu premium', 'gizli ücretler', 'ücretsiz özelliklerin kaldırılması', 
-      'ödeme entegrasyonu'
-    ],
-    
-    'İçerik & Reklamlar': [
-      'içerik', 'reklam', 'bilgi', 'veri', 'paylaşım', 'spam', 'reklam çok fazla', 
-      'rahatsız edici reklam', 'reklam kaldırma', 'premium içerik', 'kalitesiz içerik', 
-      'eksik içerik', 'dolandırıcılık', 'yanıltıcı bilgi', 'clickbait', 'paylaşım hatası', 
-      'yüklenmiyor', 'içerik engeli', 'copyright', 'lisans', 'çalıntı içerik', 
-      'moderasyon eksikliği', 'kullanıcı oluşturduğu içerikler', 'reklam süresi', 
-      'şok edici içerik', 'şiddet içeriyor', 'çocuk dostu değil', 'erişim engeli'
-    ]
-  };
+// Gemini API ile kategori sınıflandırması
+async function classifyWithGemini(text: string): Promise<string | null> {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
+    const prompt = `
+      Aşağıdaki yorumu analiz et ve en uygun ana kategoriyi seç.
+      
+      Kategoriler:
+      1. Müşteri Memnuniyeti: Genel memnuniyet, beğeni veya şikayet ifadeleri
+      2. Performans: Hız, stabilite, çökme, donma gibi teknik performans konuları
+      3. Kullanılabilirlik: Arayüz, kullanım kolaylığı, tasarım
+      4. Özellikler & Güncellemeler: Yeni özellikler, güncellemeler, eksik özellikler
+      5. Güvenlik & Gizlilik: Güvenlik, gizlilik, hesap sorunları
+      6. Teknik Sorunlar: Bağlantı, sunucu, hata mesajları
+      7. Müşteri Hizmetleri: Destek, iletişim, yanıt süreleri
+      8. Fiyatlandırma & Abonelik: Ücretler, ödemeler, abonelikler
+      9. İçerik & Reklamlar: İçerik kalitesi, reklamlar
+
+      Yorum: "${text}"
+
+      Sadece kategori adını yaz, başka bir şey yazma.
+    `;
+
+    const result = await retryOperation(async () => {
+      const generationResult = await model.generateContent(prompt);
+      return generationResult.response;
+    });
+
+    const category = result.text().trim();
+    
+    // Geçerli bir kategori mi kontrol et
+    const validCategories = [
+      'Müşteri Memnuniyeti',
+      'Performans',
+      'Kullanılabilirlik',
+      'Özellikler & Güncellemeler',
+      'Güvenlik & Gizlilik',
+      'Teknik Sorunlar',
+      'Müşteri Hizmetleri',
+      'Fiyatlandırma & Abonelik',
+      'İçerik & Reklamlar'
+    ];
+
+    return validCategories.includes(category) ? category : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Mevcut analyzeCategories fonksiyonunu güncelle
+async function analyzeCategories(reviews: (GooglePlayReview | AppStoreReview)[]): Promise<{ [key: string]: number }> {
   const categoryCounts: { [key: string]: number } = {};
 
-  reviews.forEach(review => {
+  for (const review of reviews) {
+    try {
+      const geminiCategory = await classifyWithGemini(review.text);
+      
+      if (geminiCategory) {
+        categoryCounts[geminiCategory] = (categoryCounts[geminiCategory] || 0) + 1;
+        continue;
+      }
+    } catch {
+      // Sessizce devam et ve anahtar kelime bazlı sisteme geç
+    }
+
+    // Gemini başarısız olursa anahtar kelime bazlı sistemi kullan
     const text = review.text.toLowerCase();
     let foundCategory = false;
 
-    for (const [category, keywords] of Object.entries(categories)) {
-      if (keywords.some(keyword => text.includes(keyword))) {
-        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    // Metni temizleyen yardımcı fonksiyon
+    const cleanText = (text: string): string => {
+      return text
+        .toLowerCase()
+        .replace(/[.,!?;:'"]/g, ' ') // Noktalama işaretlerini boşluğa çevir
+        .replace(/\s+/g, ' ')        // Birden fazla boşluğu teke indir
+        .trim();
+    };
+
+    // Kelime sınırlarını kontrol eden yardımcı fonksiyon
+    const containsWord = (text: string, word: string): boolean => {
+      // Emoji kontrolü
+      if (word.match(/[\u{1F300}-\u{1F9FF}]|[\u{2700}-\u{27BF}]|[\u{2600}-\u{26FF}]/u)) {
+        return text.includes(word);
+      }
+      
+      // Metni ve aranacak kelimeyi temizle
+      const cleanedText = cleanText(text);
+      const cleanedWord = cleanText(word);
+      
+      // Kelime sınırlarını kontrol et
+      return cleanedText.split(' ').some(w => w === cleanedWord);
+    };
+
+    // Birden fazla kelimeden oluşan ifadeleri kontrol eden fonksiyon
+    const containsPhrase = (text: string, phrase: string): boolean => {
+      const cleanedText = cleanText(text);
+      const cleanedPhrase = cleanText(phrase);
+      return cleanedText.includes(cleanedPhrase);
+    };
+
+    // Önce Müşteri Memnuniyeti kategorisini kontrol et
+    const customerSatisfactionKeywords = ['süper', 'harika', 'mükemmel', 'muhteşem', 'çok iyi', 'başarılı', 'güzel', 'fevkalade',
+      'enfes', 'kusursuz', 'şahane', 'efsane', 'memnun', 'teşekkür', 'bravo', 'tebrik',
+      'beğendim', 'sevdim', 'tavsiye ederim', 'öneririm', 'tam not', 'başarılı', 'iyi iş',
+      'güzel olmuş', 'iyi', 'hoş', 'keyifli', 'mutlu', 'sevindim', 'memnunum', 'çok güzel',
+      'bayıldım', '👍', '❤️', '😊', '🙂', '♥️', 'süpersin', 'harikasın', 'perfect',
+      'berbat', 'rezalet', 'kötü', 'berbat', 'felaket', 'korkunç', 'vasat', 'yetersiz',
+      'başarısız', 'beğenmedim', 'sevmedim', 'pişman', 'tavsiye etmem', 'önermem', 'sıfır',
+      'boşuna', 'zaman kaybı', 'hayal kırıklığı', 'memnun değilim', 'işe yaramaz',
+      'berbat olmuş', 'çöp', 'kötü olmuş', 'facia', 'rezil', 'berbat', 'saçma',
+      'beğenmedim', '👎', '😠', '😡', '🤬', '💩', 'worst', 'terrible'];
+    if (customerSatisfactionKeywords.some(keyword => {
+      // Kelime veya emoji kontrolü
+      if (keyword.match(/[\u{1F300}-\u{1F9FF}]|[\u{2700}-\u{27BF}]|[\u{2600}-\u{26FF}]/u)) {
+        return text.includes(keyword);
+      }
+      // Çok kelimeli ifade kontrolü
+      if (keyword.includes(' ')) {
+        return containsPhrase(text, keyword);
+      }
+      // Tek kelime kontrolü
+      return containsWord(text, keyword);
+    })) {
+      categoryCounts['Müşteri Memnuniyeti'] = (categoryCounts['Müşteri Memnuniyeti'] || 0) + 1;
+      foundCategory = true;
+    }
+
+    // Diğer kategorileri kontrol et
+    if (!foundCategory) {
+      for (const [category, keywords] of Object.entries(categories)) {
+        if (category === 'Müşteri Memnuniyeti') continue;
+        
+        if (keywords.some(keyword => {
+          if (keyword.match(/[\u{1F300}-\u{1F9FF}]|[\u{2700}-\u{27BF}]|[\u{2600}-\u{26FF}]/u)) {
+            return text.includes(keyword);
+          }
+          if (keyword.includes(' ')) {
+            return containsPhrase(text, keyword);
+          }
+          return containsWord(text, keyword);
+        })) {
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+          foundCategory = true;
+          break;
+        }
+      }
+    }
+
+    // Eğer hiçbir kategori bulunamadıysa ve yorum çok kısaysa Müşteri Memnuniyeti'ne ekle
+    if (!foundCategory && cleanText(text).split(' ').length <= 3) {
+      const positiveWords = ['iyi', 'güzel', 'süper', 'harika', '👍', '❤️', 'teşekkür'];
+      const negativeWords = ['kötü', 'berbat', 'rezalet', '👎', '😠'];
+      
+      const hasPositive = positiveWords.some(word => containsWord(text, word));
+      const hasNegative = negativeWords.some(word => containsWord(text, word));
+      
+      if (hasPositive || hasNegative) {
+        categoryCounts['Müşteri Memnuniyeti'] = (categoryCounts['Müşteri Memnuniyeti'] || 0) + 1;
         foundCategory = true;
       }
     }
 
+    // Hala hiçbir kategori bulunamadıysa Diğer'e ekle
     if (!foundCategory) {
       categoryCounts['Diğer'] = (categoryCounts['Diğer'] || 0) + 1;
     }
-  });
+  }
 
   return categoryCounts;
 } 

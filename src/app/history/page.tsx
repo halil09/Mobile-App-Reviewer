@@ -72,12 +72,12 @@ export default function HistoryPage() {
     
     // Genel istatistikler sayfası
     const statsData = [
-      ['Uygulama Adı', analysis.appInfo.title],
+      ['Uygulama Adı', analysis.appInfo?.title || 'İsimsiz Uygulama'],
       ['Platform', analysis.platform === 'google' ? 'Google Play Store' : 'App Store'],
-      ['Toplam Yorum', analysis.statistics.total],
-      ['Olumlu Yorumlar', analysis.statistics.positive],
-      ['Nötr Yorumlar', analysis.statistics.neutral],
-      ['Olumsuz Yorumlar', analysis.statistics.negative],
+      ['Toplam Yorum', analysis.statistics?.total || 0],
+      ['Olumlu Yorumlar', analysis.statistics?.positive || 0],
+      ['Nötr Yorumlar', analysis.statistics?.neutral || 0],
+      ['Olumsuz Yorumlar', analysis.statistics?.negative || 0],
       ['Analiz Tarihi', new Date(analysis.createdAt).toLocaleString('tr-TR')]
     ];
     const statsSheet = XLSX.utils.aoa_to_sheet(statsData);
@@ -188,21 +188,21 @@ export default function HistoryPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Toplam Yorum</span>
-                        <span className="font-medium text-gray-800">{analysis.statistics.total}</span>
+                        <span className="font-medium text-gray-800">{analysis.statistics?.total || 0}</span>
                       </div>
                       
                       <div className="grid grid-cols-3 gap-4">
                         <div className="bg-green-50 p-3 rounded-lg">
                           <div className="text-sm text-green-600">Olumlu</div>
-                          <div className="font-medium text-green-700">{analysis.statistics.positive}</div>
+                          <div className="font-medium text-green-700">{analysis.statistics?.positive || 0}</div>
                         </div>
                         <div className="bg-gray-50 p-3 rounded-lg">
                           <div className="text-sm text-gray-600">Nötr</div>
-                          <div className="font-medium text-gray-700">{analysis.statistics.neutral}</div>
+                          <div className="font-medium text-gray-700">{analysis.statistics?.neutral || 0}</div>
                         </div>
                         <div className="bg-red-50 p-3 rounded-lg">
                           <div className="text-sm text-red-600">Olumsuz</div>
-                          <div className="font-medium text-red-700">{analysis.statistics.negative}</div>
+                          <div className="font-medium text-red-700">{analysis.statistics?.negative || 0}</div>
                         </div>
                       </div>
                     </div>

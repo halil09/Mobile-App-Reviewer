@@ -27,48 +27,59 @@ export async function POST(request: Request) {
       throw new Error("Uygulama bulunamadı");
     }
 
-    // Yorumları çekelim (son 50 yorum)
-    const reviewsResponse = await fetch(
-      `https://itunes.apple.com/tr/rss/customerreviews/page=1/id=${appId}/sortby=mostrecent/json`
-    );
-
-    if (!reviewsResponse.ok) {
-      throw new Error("App Store'dan yorumlar çekilemedi");
-    }
-
-    const reviewsData = await reviewsResponse.json();
     let reviews = [];
+    let reviewsFetched = false;
 
-    // Feed yapısını kontrol et
-    if (reviewsData.feed && Array.isArray(reviewsData.feed.entry)) {
-      reviews = reviewsData.feed.entry.map((entry: any) => ({
-        id: entry.id?.label || String(Math.random()),
-        userName: entry.author?.name?.label || 'Anonim',
-        title: entry.title?.label || '',
-        text: entry.content?.label || '',
-        score: parseInt(entry['im:rating']?.label || '0'),
-        date: new Date(entry.updated?.label || Date.now()).toISOString(),
-        version: entry['im:version']?.label || ''
-      }));
-    } else {
-      // Alternatif olarak Store API'den yorum verisi çek
-      const storeReviewsResponse = await fetch(
-        `https://itunes.apple.com/tr/customer-reviews/id${appId}?displayable-kind=11`
+    // İlk yöntem: RSS feed üzerinden yorumları çekmeyi dene
+    try {
+      const rssResponse = await fetch(
+        `https://itunes.apple.com/tr/rss/customerreviews/id=${appId}/sortBy=mostRecent/json`
       );
 
-      if (storeReviewsResponse.ok) {
-        const storeReviews = await storeReviewsResponse.json();
-        if (storeReviews && Array.isArray(storeReviews.userReviewList)) {
-          reviews = storeReviews.userReviewList.map((review: any) => ({
-            id: review.reviewId || String(Math.random()),
-            userName: review.nickname || 'Anonim',
-            title: review.title || '',
-            text: review.review || '',
-            score: review.rating || 0,
-            date: new Date(review.date).toISOString(),
-            version: review.appVersion || ''
+      if (rssResponse.ok) {
+        const rssData = await rssResponse.json();
+        
+        if (rssData.feed && Array.isArray(rssData.feed.entry)) {
+          reviews = rssData.feed.entry.map((entry: any) => ({
+            id: entry.id?.label || String(Math.random()),
+            userName: entry.author?.name?.label || 'Anonim',
+            title: entry.title?.label || '',
+            text: entry.content?.label || '',
+            score: parseInt(entry['im:rating']?.label || '0'),
+            date: new Date(entry.updated?.label || Date.now()).toISOString(),
+            version: entry['im:version']?.label || ''
           }));
+          reviewsFetched = true;
         }
+      }
+    } catch (error) {
+      console.warn('RSS feed üzerinden yorumlar çekilemedi, alternatif yönteme geçiliyor...');
+    }
+
+    // İkinci yöntem: Store API üzerinden yorumları çekmeyi dene
+    if (!reviewsFetched) {
+      try {
+        const storeReviewsResponse = await fetch(
+          `https://itunes.apple.com/tr/rss/customerreviews/page=1/id=${appId}/sortby=mostrecent/json`
+        );
+
+        if (storeReviewsResponse.ok) {
+          const storeReviews = await storeReviewsResponse.json();
+          if (storeReviews?.feed?.entry) {
+            reviews = storeReviews.feed.entry.map((review: any) => ({
+              id: review.id?.label || String(Math.random()),
+              userName: review.author?.name?.label || 'Anonim',
+              title: review.title?.label || '',
+              text: review.content?.label || '',
+              score: parseInt(review['im:rating']?.label || '0'),
+              date: new Date(review.updated?.label || Date.now()).toISOString(),
+              version: review['im:version']?.label || ''
+            }));
+            reviewsFetched = true;
+          }
+        }
+      } catch (error) {
+        console.warn('Store API üzerinden yorumlar çekilemedi');
       }
     }
 
@@ -86,7 +97,7 @@ export async function POST(request: Request) {
     };
 
     // Eğer hiç yorum bulunamazsa
-    if (reviews.length === 0) {
+    if (!reviewsFetched || reviews.length === 0) {
       return NextResponse.json({
         appInfo,
         reviews: [],
